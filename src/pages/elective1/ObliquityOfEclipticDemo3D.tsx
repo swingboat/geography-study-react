@@ -712,8 +712,7 @@ function MobileControlPanel({
           cursor: 'pointer',
         }}
       >
-        <motion.div
-          animate={{ rotate: isExpanded ? 180 : 0 }}
+        <div
           style={{
             background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
             borderRadius: 20,
@@ -727,8 +726,13 @@ function MobileControlPanel({
           <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
             {isExpanded ? '收起' : '控制面板'}
           </Typography>
-          <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
-        </motion.div>
+          <motion.div
+            animate={{ rotate: isExpanded ? 180 : 0 }}
+            style={{ display: 'flex', alignItems: 'center' }}
+          >
+            <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
+          </motion.div>
+        </div>
       </div>
 
       {/* 面板内容 */}

@@ -18,6 +18,7 @@ import {
   ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
+import TropicsDemo3D from './pages/elective1/TropicsDemo3D';
 
 // 动画变体
 const containerVariants = {
@@ -139,6 +140,44 @@ function HomePage() {
                 </Card>
               </motion.div>
 
+              {/* 南北回归线 */}
+              <motion.div variants={itemVariants}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    background: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }
+                  }}
+                >
+                  <CardActionArea component={Link} to="/elective1/tropics" sx={{ height: '100%', p: 1 }}>
+                    <CardContent>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌐</div>
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                        南北回归线
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        了解回归线的位置与意义，观察太阳直射点的移动规律
+                      </Typography>
+                      <Chip 
+                        label="✨ 3D 互动" 
+                        sx={{ 
+                          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                          color: 'white',
+                          fontWeight: 600
+                        }} 
+                        size="small" 
+                      />
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </motion.div>
+
               {/* 四季变化 - 待开发 */}
               <motion.div variants={itemVariants}>
                 <Card 
@@ -156,29 +195,6 @@ function HomePage() {
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                       了解地球公转过程中四季的形成机制
-                    </Typography>
-                    <Chip label="🚀 开发中" color="default" size="small" />
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* 太阳直射点 - 待开发 */}
-              <motion.div variants={itemVariants}>
-                <Card 
-                  sx={{ 
-                    height: '100%', 
-                    background: 'rgba(255,255,255,0.6)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: 4,
-                  }}
-                >
-                  <CardContent>
-                    <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.5 }}>📍</div>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-                      太阳直射点移动
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      观察太阳直射点在南北回归线间的移动规律
                     </Typography>
                     <Chip label="🚀 开发中" color="default" size="small" />
                   </CardContent>
@@ -260,6 +276,74 @@ function ObliquityPage() {
   );
 }
 
+// 南北回归线页面
+function TropicsPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+      {/* 移动端固定返回按钮 */}
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+          }}
+        >
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #DC2626 0%, #EA580C 100%)',
+              },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        </div>
+      )}
+
+      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#EF4444' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>南北回归线</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
+        
+        <TropicsDemo3D />
+      </Container>
+    </div>
+  );
+}
+
 // 主应用组件
 function App() {
   return (
@@ -267,6 +351,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/elective1/obliquity" element={<ObliquityPage />} />
+        <Route path="/elective1/tropics" element={<TropicsPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -378,6 +378,8 @@ function Scene({ obliquity, isPlaying, showLabels, cameraRef }: SceneProps) {
 
   useFrame((_, delta) => {
     if (isPlaying) {
+      // 地球公转方向：从北极上方俯视为逆时针（自西向东）
+      // 在 Three.js 坐标系中，使用负 sin 使运动方向变为逆时针
       setOrbitAngle(prev => (prev + delta * 0.3) % (Math.PI * 2));
     }
   });
@@ -385,7 +387,7 @@ function Scene({ obliquity, isPlaying, showLabels, cameraRef }: SceneProps) {
   const earthPosition: [number, number, number] = [
     Math.cos(orbitAngle) * orbitRadius,
     0,
-    Math.sin(orbitAngle) * orbitRadius
+    -Math.sin(orbitAngle) * orbitRadius  // 负号使公转方向为逆时针
   ];
 
   return (

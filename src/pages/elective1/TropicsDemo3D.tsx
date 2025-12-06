@@ -1,0 +1,1701 @@
+/**
+ * 南北回归线 3D 交互式动画组件
+ * 使用 Three.js + React Three Fiber 实现真 3D 效果
+ * 
+ * 面向高中生的现代化、活泼的教学动画
+ */
+
+import { useRef, useState, useMemo, Suspense, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { 
+  OrbitControls, 
+  Stars, 
+  Line,
+  Html,
+  useTexture
+} from '@react-three/drei';
+import { motion, AnimatePresence } from 'framer-motion';
+import * as THREE from 'three';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Slider,
+  Chip,
+  useTheme,
+  useMediaQuery,
+  IconButton,
+  Tooltip,
+  LinearProgress,
+  ToggleButton,
+  ToggleButtonGroup,
+} from '@mui/material';
+import {
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+  RestartAlt as ResetIcon,
+  Info as InfoIcon,
+  ChevronLeft as CollapseIcon,
+  ChevronRight as ExpandIcon,
+  ThreeDRotation as ThreeDIcon,
+  ScreenRotation as ScreenRotationIcon,
+  ExpandMore as ExpandMoreIcon,
+  Label as LabelIcon,
+  LabelOff as LabelOffIcon,
+  SlowMotionVideo as AnimationIcon,
+} from '@mui/icons-material';
+
+// ===================== 类型定义 =====================
+
+interface TropicsDemo3DProps {
+  initialObliquity?: number;
+}
+
+type SeasonType = 'summer' | 'winter' | 'spring' | 'autumn';
+
+// ===================== 自定义图标 =====================
+
+/** 2D 旋转图标 */
+const TwoDIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    <path d="M7.52 21.48C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
+    <path d="M16.48 2.52C19.75 4.06 22.09 7.24 22.45 11h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32z"/>
+    <text x="6" y="16" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">2D</text>
+  </svg>
+);
+
+// ===================== 常量 =====================
+
+const COLORS = {
+  sun: '#FFD93D',
+  sunGlow: '#FFF3B0',
+  earth: '#4A90D9',
+  tropicOfCancer: '#EF4444',      // 北回归线 - 红色
+  tropicOfCapricorn: '#3B82F6',   // 南回归线 - 蓝色
+  equator: '#10B981',             // 赤道 - 绿色
+  arcticCircle: '#F97316',        // 北极圈 - 橙色
+  antarcticCircle: '#8B5CF6',     // 南极圈 - 紫色
+  sunRay: '#FBBF24',              // 太阳光线
+  axis: '#94A3B8',
+  space: '#0F172A',
+};
+
+const OBLIQUITY = 23 + 26/60; // 23°26′
+
+/** 格式化角度为度分格式 */
+const formatDegreeMinute = (value: number) => {
+  const degrees = Math.floor(Math.abs(value));
+  const minutes = Math.round((Math.abs(value) - degrees) * 60);
+  // 纬度为0时（赤道）不显示N/S
+  if (Math.abs(value) < 0.01) {
+    return `${degrees}°${minutes}′`;
+  }
+  const sign = value > 0 ? 'N' : 'S';
+  return `${degrees}°${minutes}′${sign}`;
+};
+
+/** 季节配置 */
+const SEASONS: Record<SeasonType, { 
+  name: string; 
+  date: string; 
+  sunLatitude: number; 
+  description: string;
+  emoji: string;
+}> = {
+  spring: {
+    name: '春分',
+    date: '3月21日前后',
+    sunLatitude: 0,
+    description: '太阳直射赤道，全球昼夜等长',
+    emoji: '🌸',
+  },
+  summer: {
+    name: '夏至',
+    date: '6月21日前后',
+    sunLatitude: OBLIQUITY,
+    description: '太阳直射北回归线，北半球白昼最长',
+    emoji: '☀️',
+  },
+  autumn: {
+    name: '秋分',
+    date: '9月23日前后',
+    sunLatitude: 0,
+    description: '太阳直射赤道，全球昼夜等长',
+    emoji: '🍂',
+  },
+  winter: {
+    name: '冬至',
+    date: '12月22日前后',
+    sunLatitude: -OBLIQUITY,
+    description: '太阳直射南回归线，北半球白昼最短',
+    emoji: '❄️',
+  },
+};
+
+// ===================== 3D 组件 =====================
+
+/** 公转轨道半径 */
+const ORBIT_RADIUS = 8;
+
+/** 太阳光线组件 - 从太阳射向地球 */
+function SunRays({ earthPosition }: { earthPosition: [number, number, number] }) {
+  // 计算从太阳到地球的方向
+  const sunPos = [0, 0, 0];
+  const direction = [
+    earthPosition[0] - sunPos[0],
+    earthPosition[1] - sunPos[1],
+    earthPosition[2] - sunPos[2],
+  ];
+  const length = Math.sqrt(direction[0]**2 + direction[1]**2 + direction[2]**2);
+  const normalized = direction.map(d => d / length);
+  
+  // 光线从太阳表面开始，到地球表面结束
+  const rayStart: [number, number, number] = [
+    sunPos[0] + normalized[0] * 1.5, // 从太阳表面开始
+    sunPos[1] + normalized[1] * 1.5,
+    sunPos[2] + normalized[2] * 1.5,
+  ];
+  
+  // 直射点位置（地球表面）
+  const directPoint: [number, number, number] = [
+    earthPosition[0] - normalized[0] * 2, // 地球表面
+    earthPosition[1] - normalized[1] * 2,
+    earthPosition[2] - normalized[2] * 2,
+  ];
+
+  // 计算垂直于光线方向的向量（用于垂直虚线）
+  // 在水平面上与光线方向垂直的向量
+  const perpHorizontal: [number, number, number] = [
+    -normalized[2],
+    0,
+    normalized[0],
+  ];
+  const perpHLen = Math.sqrt(perpHorizontal[0]**2 + perpHorizontal[2]**2);
+  const perpHNorm: [number, number, number] = [
+    perpHorizontal[0] / (perpHLen || 1),
+    0,
+    perpHorizontal[2] / (perpHLen || 1),
+  ];
+  
+  // 垂直虚线的两端
+  const perpLineLength = 1.5;
+  const perpStart: [number, number, number] = [
+    directPoint[0] + perpHNorm[0] * perpLineLength,
+    directPoint[1] + perpHNorm[1] * perpLineLength,
+    directPoint[2] + perpHNorm[2] * perpLineLength,
+  ];
+  const perpEnd: [number, number, number] = [
+    directPoint[0] - perpHNorm[0] * perpLineLength,
+    directPoint[1] - perpHNorm[1] * perpLineLength,
+    directPoint[2] - perpHNorm[2] * perpLineLength,
+  ];
+  
+  return (
+    <group>
+      {/* 太阳直射线 - 一条粗线 */}
+      <Line
+        points={[rayStart, directPoint]}
+        color={COLORS.sunRay}
+        lineWidth={4}
+      />
+      
+      {/* 直射点高亮标识 - 发光球体 */}
+      <mesh position={directPoint}>
+        <sphereGeometry args={[0.25, 16, 16]} />
+        <meshBasicMaterial color="#FBBF24" transparent opacity={0.6} />
+      </mesh>
+      <mesh position={directPoint}>
+        <sphereGeometry args={[0.15, 16, 16]} />
+        <meshBasicMaterial color="#FFFFFF" />
+      </mesh>
+      
+      {/* 直射点处的垂直虚线 - 显示这是直射点 */}
+      <Line
+        points={[perpStart, perpEnd]}
+        color="#FFFFFF"
+        lineWidth={2}
+        dashed
+        dashSize={0.15}
+        gapSize={0.1}
+      />
+      
+      {/* 垂直虚线端点小球 */}
+      <mesh position={perpStart}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshBasicMaterial color="#FFFFFF" />
+      </mesh>
+      <mesh position={perpEnd}>
+        <sphereGeometry args={[0.06, 8, 8]} />
+        <meshBasicMaterial color="#FFFFFF" />
+      </mesh>
+    </group>
+  );
+}
+
+/** 纬线圈组件 */
+function LatitudeLine({ 
+  latitude, 
+  radius, 
+  color, 
+  label, 
+  showLabel = true,
+  dashed = false 
+}: { 
+  latitude: number; 
+  radius: number; 
+  color: string; 
+  label: string;
+  showLabel?: boolean;
+  dashed?: boolean;
+}) {
+  const latRad = (latitude * Math.PI) / 180;
+  const y = Math.sin(latRad) * radius;
+  const circleRadius = Math.cos(latRad) * radius;
+
+  const points = useMemo(() => {
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i <= 64; i++) {
+      const angle = (i / 64) * Math.PI * 2;
+      pts.push([
+        Math.cos(angle) * circleRadius,
+        y,
+        Math.sin(angle) * circleRadius
+      ]);
+    }
+    return pts;
+  }, [circleRadius, y]);
+
+  return (
+    <group>
+      <Line
+        points={points}
+        color={color}
+        lineWidth={2}
+        dashed={dashed}
+        dashSize={0.1}
+        gapSize={0.05}
+      />
+      {showLabel && (
+        <Html position={[circleRadius + 0.3, y, 0]} center>
+          <div style={{ 
+            color: color, 
+            fontSize: '11px', 
+            fontWeight: 'bold',
+            whiteSpace: 'nowrap',
+            background: 'rgba(0,0,0,0.5)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}>
+            {label}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+/** 地球组件 - 带纬线 */
+interface EarthProps {
+  sunLatitude: number;
+  showLabels: boolean;
+  autoRotate: boolean;
+  isYearAnimating: boolean;
+}
+
+function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthProps) {
+  const earthRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+  
+  // 正确的物理模型：
+  // 1. 地轴始终倾斜23.5°，指向北极星方向（右上方，+X方向）
+  // 2. rotation Z轴负值表示向右倾斜（北极指向+X方向）
+  // 3. 夏至时地球在太阳左上方(-X)，北极朝向太阳(+X方向)，直射北回归线
+  // 4. 冬至时地球在太阳右下方(+X)，北极背离太阳，直射南回归线
+  const fixedTiltAngleRad = (OBLIQUITY * Math.PI) / 180; // 固定23.5°倾斜
+
+  // 加载地球纹理
+  const [earthMap, earthNormal, earthSpec, cloudsMap] = useTexture([
+    '/textures/earth.jpg',
+    '/textures/earth_normal.jpg',
+    '/textures/earth_specular.jpg',
+    '/textures/earth_clouds.png',
+  ]);
+
+  // 地球自转 + 动画时光晕脉冲效果
+  useFrame(({ clock }) => {
+    if (earthRef.current && autoRotate) {
+      earthRef.current.rotation.y = clock.elapsedTime * 0.2;
+    }
+    // 年循环动画时，直射点光晕脉冲
+    if (glowRef.current && isYearAnimating) {
+      const scale = 1 + Math.sin(clock.elapsedTime * 5) * 0.4;
+      glowRef.current.scale.setScalar(scale);
+    } else if (glowRef.current) {
+      const scale = 1 + Math.sin(clock.elapsedTime * 2) * 0.2;
+      glowRef.current.scale.setScalar(scale);
+    }
+  });
+
+  // 地轴方向
+  const axisLength = 3;
+  const axisTop: [number, number, number] = [0, axisLength, 0];
+  const axisBottom: [number, number, number] = [0, -axisLength, 0];
+
+  return (
+    <group rotation={[0, 0, -fixedTiltAngleRad]}>
+      {/* 地球主体 - 地轴固定倾斜23.5°，北极向右（+X方向/北极星方向）倾斜 */}
+      {/* 夏至时地球在太阳左上(-X)，北极朝向太阳，直射点在北回归线 */}
+      <mesh ref={earthRef}>
+        <sphereGeometry args={[2, 64, 64]} />
+        <meshStandardMaterial
+          map={earthMap}
+          normalMap={earthNormal}
+          normalScale={new THREE.Vector2(0.5, 0.5)}
+          roughnessMap={earthSpec}
+          roughness={0.5}
+          metalness={0.1}
+        />
+      </mesh>
+      
+      {/* 云层 */}
+      <mesh>
+        <sphereGeometry args={[2.05, 64, 64]} />
+        <meshBasicMaterial
+          map={cloudsMap}
+          transparent
+          opacity={0.2}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* 大气层 */}
+      <mesh>
+        <sphereGeometry args={[2.15, 64, 64]} />
+        <meshBasicMaterial
+          color="#88CCFF"
+          transparent
+          opacity={0.1}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      {/* 地轴 */}
+      <Line
+        points={[axisBottom, axisTop]}
+        color={COLORS.axis}
+        lineWidth={2}
+      />
+      <mesh position={axisTop}>
+        <sphereGeometry args={[0.08, 16, 16]} />
+        <meshBasicMaterial color={COLORS.axis} />
+      </mesh>
+
+      {/* 赤道 */}
+      <LatitudeLine 
+        latitude={0} 
+        radius={2.02} 
+        color={COLORS.equator} 
+        label="赤道 0°"
+        showLabel={showLabels}
+      />
+
+      {/* 北回归线 */}
+      <LatitudeLine 
+        latitude={OBLIQUITY} 
+        radius={2.02} 
+        color={COLORS.tropicOfCancer} 
+        label={`北回归线 ${formatDegreeMinute(OBLIQUITY)}`}
+        showLabel={showLabels}
+      />
+
+      {/* 南回归线 */}
+      <LatitudeLine 
+        latitude={-OBLIQUITY} 
+        radius={2.02} 
+        color={COLORS.tropicOfCapricorn} 
+        label={`南回归线 ${formatDegreeMinute(-OBLIQUITY)}`}
+        showLabel={showLabels}
+      />
+
+      {/* 北极圈 */}
+      <LatitudeLine 
+        latitude={90 - OBLIQUITY} 
+        radius={2.02} 
+        color={COLORS.arcticCircle} 
+        label={`北极圈 ${formatDegreeMinute(90 - OBLIQUITY)}`}
+        showLabel={showLabels}
+        dashed
+      />
+
+      {/* 南极圈 */}
+      <LatitudeLine 
+        latitude={-(90 - OBLIQUITY)} 
+        radius={2.02} 
+        color={COLORS.antarcticCircle} 
+        label={`南极圈 ${formatDegreeMinute(-(90 - OBLIQUITY))}`}
+        showLabel={showLabels}
+        dashed
+      />
+
+      {/* 太阳直射点标记 - 增强版 */}
+      {(() => {
+        const latRad = (sunLatitude * Math.PI) / 180;
+        const y = Math.sin(latRad) * 2.15;
+        const x = Math.cos(latRad) * 2.15;
+        return (
+          <group>
+            {/* 直射点光晕（脉冲效果） */}
+            <mesh ref={glowRef} position={[x, y, 0]}>
+              <sphereGeometry args={[0.3, 16, 16]} />
+              <meshBasicMaterial color="#FBBF24" transparent opacity={0.25} />
+            </mesh>
+            
+            {/* 直射点核心 */}
+            <mesh position={[x, y, 0]}>
+              <sphereGeometry args={[0.18, 16, 16]} />
+              <meshBasicMaterial color="#FBBF24" />
+            </mesh>
+            
+            {/* 直射点标记环 */}
+            <mesh position={[x, y, 0.01]} rotation={[0, 0, 0]}>
+              <ringGeometry args={[0.22, 0.28, 32]} />
+              <meshBasicMaterial color="#FFF" transparent opacity={0.9} side={THREE.DoubleSide} />
+            </mesh>
+            {/* 直射点纬度标签已移至右侧信息栏显示，避免随地球自转 */}
+          </group>
+        );
+      })()}
+
+      {/* N极标签 */}
+      {showLabels && (
+        <Html position={[0, axisLength + 0.3, 0]} center>
+          <div style={{ color: COLORS.axis, fontSize: '12px', fontWeight: 'bold' }}>N</div>
+        </Html>
+      )}
+      
+      {/* 自转方向指示器 */}
+      <RotationIndicator showLabels={showLabels} />
+    </group>
+  );
+}
+
+/** 太阳组件 */
+function Sun() {
+  const glowRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    if (glowRef.current) {
+      glowRef.current.scale.setScalar(1 + Math.sin(clock.elapsedTime * 2) * 0.05);
+    }
+  });
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* 太阳光晕 */}
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[1.8, 32, 32]} />
+        <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
+      </mesh>
+      {/* 太阳本体 */}
+      <mesh>
+        <sphereGeometry args={[1.2, 64, 64]} />
+        <meshBasicMaterial color={COLORS.sun} />
+      </mesh>
+      <pointLight intensity={3} distance={100} color={COLORS.sun} />
+      <Html position={[0, -2.5, 0]} center>
+        <div style={{ 
+          color: COLORS.sun, 
+          fontSize: '14px', 
+          fontWeight: 'bold',
+          textShadow: '0 0 10px rgba(255,217,61,0.8)',
+          whiteSpace: 'nowrap'
+        }}>
+          ☀️ 太阳
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** 公转轨道组件 - 带方向箭头 */
+function OrbitPath() {
+  const points = useMemo(() => {
+    const pts: [number, number, number][] = [];
+    for (let i = 0; i <= 64; i++) {
+      const angle = (i / 64) * Math.PI * 2;
+      pts.push([
+        Math.cos(angle) * ORBIT_RADIUS,
+        0,
+        -Math.sin(angle) * ORBIT_RADIUS
+      ]);
+    }
+    return pts;
+  }, []);
+
+  // 公转方向箭头位置（在轨道上放置几个箭头表示逆时针方向）
+  const arrowPositions = useMemo(() => {
+    const positions: { pos: [number, number, number]; rotationZ: number }[] = [];
+    // 在4个位置放置箭头
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + Math.PI / 8; // 偏移一点避开季节标记
+      // 公转方向：从北极俯视是逆时针
+      // 位置: (cos(angle), 0, -sin(angle))
+      // 逆时针切线方向 = d/dθ (cos(θ), 0, -sin(θ)) = (-sin(θ), 0, -cos(θ))
+      const tangentX = -Math.sin(angle);
+      const tangentZ = -Math.cos(angle);
+      
+      // 箭头在XZ平面上，计算绕Y轴旋转角度使其指向逆时针切线方向
+      const rotationZ = Math.atan2(tangentZ, tangentX);
+      
+      positions.push({
+        pos: [
+          Math.cos(angle) * ORBIT_RADIUS,
+          0,
+          -Math.sin(angle) * ORBIT_RADIUS
+        ],
+        rotationZ: rotationZ,
+      });
+    }
+    return positions;
+  }, []);
+
+  return (
+    <group>
+      <Line
+        points={points}
+        color="#ffffff"
+        lineWidth={1}
+        dashed
+        dashSize={0.5}
+        gapSize={0.3}
+        transparent
+        opacity={0.3}
+      />
+      {/* 公转方向箭头 */}
+      {arrowPositions.map((arrow, i) => (
+        <group key={i} position={arrow.pos}>
+          <mesh rotation={[Math.PI / 2, 0, arrow.rotationZ - Math.PI / 2]}>
+            <coneGeometry args={[0.2, 0.5, 8]} />
+            <meshBasicMaterial color="#4ADE80" transparent opacity={0.7} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** 自转方向指示器 - 在地球旁边显示 */
+function RotationIndicator({ showLabels }: { showLabels: boolean }) {
+  if (!showLabels) return null;
+  
+  return (
+    <Html position={[2.5, 1.5, 0]} center>
+      <div style={{
+        color: '#60A5FA',
+        fontSize: '10px',
+        fontWeight: 'bold',
+        whiteSpace: 'nowrap',
+        background: 'rgba(0,0,0,0.5)',
+        padding: '2px 6px',
+        borderRadius: 4,
+      }}>
+        ↺ 自转（西→东）
+      </div>
+    </Html>
+  );
+}
+
+/** 季节位置标记 */
+function SeasonMarkers() {
+  // 坐标系：位置 = (cos(angle), 0, -sin(angle))，从北极俯视逆时针
+  // 地轴指向+X（北极星方向），决定了季节与位置的对应关系：
+  // - 冬至: angle=0 → (+X, 0, 0) 右下 → 北极背离太阳 → 直射南回归线
+  // - 春分: angle=π/2 → (0, 0, -1) 右上 → 直射赤道
+  // - 夏至: angle=π → (-X, 0, 0) 左上 → 北极朝向太阳 → 直射北回归线
+  // - 秋分: angle=3π/2 → (0, 0, +1) 左下 → 直射赤道
+  const markers = [
+    { angle: 0, label: '冬至', emoji: '❄️', color: '#3B82F6' },                    // 右下 (+X) - 北极背离太阳
+    { angle: Math.PI / 2, label: '春分', emoji: '🌸', color: '#10B981' },          // 右上 (-Z)
+    { angle: Math.PI, label: '夏至', emoji: '☀️', color: '#EF4444' },              // 左上 (-X) - 北极朝向太阳
+    { angle: (Math.PI * 3) / 2, label: '秋分', emoji: '🍂', color: '#F59E0B' },    // 左下 (+Z)
+  ];
+
+  return (
+    <group>
+      {markers.map((marker, i) => (
+        <Html 
+          key={i}
+          position={[
+            Math.cos(marker.angle) * (ORBIT_RADIUS + 1.5),
+            0.5,
+            -Math.sin(marker.angle) * (ORBIT_RADIUS + 1.5)
+          ]} 
+          center
+        >
+          <div style={{ 
+            color: marker.color, 
+            fontSize: '12px', 
+            fontWeight: 'bold',
+            whiteSpace: 'nowrap',
+            background: 'rgba(0,0,0,0.6)',
+            padding: '2px 8px',
+            borderRadius: 4,
+          }}>
+            {marker.emoji} {marker.label}
+          </div>
+        </Html>
+      ))}
+    </group>
+  );
+}
+
+/** 相机控制器 */
+interface CameraControllerHandle {
+  reset: () => void;
+}
+
+const CameraController = forwardRef<CameraControllerHandle>((_, ref) => {
+  const { camera } = useThree();
+  const controlsRef = useRef<any>(null);
+  
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      camera.position.set(12, 10, 12);
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.reset();
+      }
+    }
+  }));
+  
+  return (
+    <OrbitControls 
+      ref={controlsRef}
+      enablePan={false}
+      minDistance={8}
+      maxDistance={35}
+    />
+  );
+});
+
+/** 场景组件 */
+interface SceneProps {
+  sunLatitude: number;
+  orbitProgress: number; // 0-1，直接用于计算轨道角度
+  showLabels: boolean;
+  autoRotate: boolean;
+  isYearAnimating: boolean;
+  cameraRef: React.RefObject<CameraControllerHandle>;
+}
+
+function Scene({ sunLatitude, orbitProgress, showLabels, autoRotate, isYearAnimating, cameraRef }: SceneProps) {
+  // 直接使用orbitProgress计算轨道角度
+  // orbitProgress: 0=冬至, 0.25=春分, 0.5=夏至, 0.75=秋分, 1=冬至
+  // 
+  // 物理模型（地轴指向+X/北极星）：
+  // - 冬至: 地球在+X位置(右下)，北极背离太阳 → 直射南回归线
+  // - 春分: 地球在-Z位置(右上)，北极侧向 → 直射赤道
+  // - 夏至: 地球在-X位置(左上)，北极朝向太阳 → 直射北回归线
+  // - 秋分: 地球在+Z位置(左下)，北极侧向 → 直射赤道
+  //
+  // 公转是逆时针（从北极俯视），即 冬至→春分→夏至→秋分
+  // 从视角看：右下→右上→左上→左下 = 逆时针
+  // 
+  // 位置: (cos(angle), 0, -sin(angle))
+  // 在XZ平面，从+Y俯视，角度增加的方向：
+  // θ=0: (+X, -Z方向)=(+1,0,0) 右下
+  // θ=π/2: (0,0,-1) 右上（-Z方向）
+  // θ=π: (-1,0,0) 左上
+  // θ=3π/2: (0,0,+1) 左下
+  // 这正是视觉上的逆时针方向
+  const orbitAngle = orbitProgress * Math.PI * 2;
+  
+  // 地球在轨道上的位置
+  // 使用 -sin 使得从北极（+Y方向）俯视时公转为逆时针方向
+  const earthPosition: [number, number, number] = useMemo(() => {
+    return [
+      Math.cos(orbitAngle) * ORBIT_RADIUS,
+      0,
+      -Math.sin(orbitAngle) * ORBIT_RADIUS
+    ];
+  }, [orbitAngle]);
+
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[0, 10, 5]} intensity={1} />
+      <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
+      
+      {/* 太阳在中心 */}
+      <Sun />
+      
+      {/* 公转轨道 */}
+      <OrbitPath />
+      
+      {/* 季节位置标记 */}
+      <SeasonMarkers />
+      
+      {/* 太阳光线 - 从太阳射向地球 */}
+      <SunRays earthPosition={earthPosition} />
+      
+      {/* 地球 - 在轨道上公转 */}
+      <group position={earthPosition}>
+        <Earth 
+          sunLatitude={sunLatitude} 
+          showLabels={showLabels} 
+          autoRotate={autoRotate} 
+          isYearAnimating={isYearAnimating}
+        />
+      </group>
+      
+      <CameraController ref={cameraRef} />
+    </>
+  );
+}
+
+// ===================== 2D 视图组件 =====================
+
+function TwoDView({ sunLatitude }: { sunLatitude: number }) {
+  const cx = 200;
+  const cy = 200;
+  const earthRadius = 120;
+  
+  // 纬度转Y坐标
+  const latToY = (lat: number) => cy - (lat / 90) * earthRadius;
+  
+  const equatorY = latToY(0);
+  const tropicCancerY = latToY(OBLIQUITY);
+  const tropicCapricornY = latToY(-OBLIQUITY);
+  const arcticY = latToY(90 - OBLIQUITY);
+  const antarcticY = latToY(-(90 - OBLIQUITY));
+  const sunY = latToY(sunLatitude);
+
+  return (
+    <svg width="400" height="400" viewBox="0 0 400 400" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+      <rect width="400" height="400" fill="transparent" />
+      
+      {/* 地球圆 */}
+      <circle cx={cx} cy={cy} r={earthRadius} fill={COLORS.earth} opacity={0.3} />
+      <circle cx={cx} cy={cy} r={earthRadius} fill="none" stroke={COLORS.earth} strokeWidth="2" />
+      
+      {/* 赤道 */}
+      <line x1={cx - earthRadius} y1={equatorY} x2={cx + earthRadius} y2={equatorY} 
+        stroke={COLORS.equator} strokeWidth="2" />
+      <text x={cx + earthRadius + 5} y={equatorY + 4} fill={COLORS.equator} fontSize="11">赤道 0°</text>
+      
+      {/* 北回归线 */}
+      <line x1={cx - earthRadius * Math.cos(Math.asin(OBLIQUITY/90))} y1={tropicCancerY} 
+        x2={cx + earthRadius * Math.cos(Math.asin(OBLIQUITY/90))} y2={tropicCancerY} 
+        stroke={COLORS.tropicOfCancer} strokeWidth="2" />
+      <text x={cx + earthRadius + 5} y={tropicCancerY + 4} fill={COLORS.tropicOfCancer} fontSize="11">北回归线</text>
+      
+      {/* 南回归线 */}
+      <line x1={cx - earthRadius * Math.cos(Math.asin(OBLIQUITY/90))} y1={tropicCapricornY} 
+        x2={cx + earthRadius * Math.cos(Math.asin(OBLIQUITY/90))} y2={tropicCapricornY} 
+        stroke={COLORS.tropicOfCapricorn} strokeWidth="2" />
+      <text x={cx + earthRadius + 5} y={tropicCapricornY + 4} fill={COLORS.tropicOfCapricorn} fontSize="11">南回归线</text>
+      
+      {/* 北极圈 */}
+      <line x1={cx - earthRadius * Math.cos(Math.asin((90-OBLIQUITY)/90))} y1={arcticY} 
+        x2={cx + earthRadius * Math.cos(Math.asin((90-OBLIQUITY)/90))} y2={arcticY} 
+        stroke={COLORS.arcticCircle} strokeWidth="2" strokeDasharray="5,3" />
+      <text x={cx + earthRadius + 5} y={arcticY + 4} fill={COLORS.arcticCircle} fontSize="11">北极圈</text>
+      
+      {/* 南极圈 */}
+      <line x1={cx - earthRadius * Math.cos(Math.asin((90-OBLIQUITY)/90))} y1={antarcticY} 
+        x2={cx + earthRadius * Math.cos(Math.asin((90-OBLIQUITY)/90))} y2={antarcticY} 
+        stroke={COLORS.antarcticCircle} strokeWidth="2" strokeDasharray="5,3" />
+      <text x={cx + earthRadius + 5} y={antarcticY + 4} fill={COLORS.antarcticCircle} fontSize="11">南极圈</text>
+      
+      {/* 太阳直射点 */}
+      <circle cx={cx} cy={sunY} r="8" fill={COLORS.sunRay} />
+      <line x1={20} y1={sunY} x2={cx - 15} y2={sunY} stroke={COLORS.sunRay} strokeWidth="2" strokeDasharray="8,4" />
+      <text x={30} y={sunY - 10} fill={COLORS.sunRay} fontSize="12" fontWeight="bold">
+        ☀️ 直射点 {formatDegreeMinute(sunLatitude)}
+      </text>
+      
+      {/* 地轴 */}
+      <line x1={cx} y1={cy - earthRadius - 20} x2={cx} y2={cy + earthRadius + 20} 
+        stroke={COLORS.axis} strokeWidth="2" />
+      <text x={cx + 5} y={cy - earthRadius - 25} fill={COLORS.axis} fontSize="12" fontWeight="bold">N</text>
+      <text x={cx + 5} y={cy + earthRadius + 35} fill={COLORS.axis} fontSize="12" fontWeight="bold">S</text>
+    </svg>
+  );
+}
+
+// ===================== 横屏提示组件 =====================
+
+function LandscapePrompt({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <motion.div
+        animate={{ rotate: [0, 90, 90, 0] }}
+        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        style={{ marginBottom: 24 }}
+      >
+        <ScreenRotationIcon sx={{ fontSize: 80, color: '#EF4444' }} />
+      </motion.div>
+      
+      <motion.div
+        animate={{ rotate: [0, 0, 90, 90, 0] }}
+        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        style={{
+          width: 60,
+          height: 100,
+          border: '4px solid #EF4444',
+          borderRadius: 12,
+          marginBottom: 32,
+          position: 'relative',
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          top: 8,
+          left: 4,
+          right: 4,
+          bottom: 20,
+          background: 'rgba(239, 68, 68, 0.3)',
+          borderRadius: 4,
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: 6,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 20,
+          height: 6,
+          background: '#EF4444',
+          borderRadius: 3,
+        }} />
+      </motion.div>
+
+      <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, textAlign: 'center', mb: 2 }}>
+        📱 请旋转手机
+      </Typography>
+      
+      <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', mb: 4, maxWidth: 280, lineHeight: 1.8 }}>
+        横屏模式下可以获得更好的 3D 交互体验，完整查看南北回归线演示
+      </Typography>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onDismiss}
+        style={{
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          border: 'none',
+          borderRadius: 12,
+          padding: '12px 32px',
+          color: 'white',
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)',
+        }}
+      >
+        继续使用竖屏
+      </motion.button>
+
+      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mt: 3, textAlign: 'center' }}>
+        横屏后此提示将自动消失
+      </Typography>
+    </motion.div>
+  );
+}
+
+// ===================== 移动端底部控制面板 =====================
+
+interface MobileControlPanelProps {
+  currentSeason: SeasonType;
+  setCurrentSeason: (season: SeasonType) => void;
+  sunLatitude: number;
+  setSunLatitude: (lat: number) => void;
+  showInfo: boolean;
+  setShowInfo: (value: boolean) => void;
+}
+
+function MobileControlPanel({
+  currentSeason,
+  setCurrentSeason,
+  sunLatitude,
+  setSunLatitude,
+  showInfo,
+  setShowInfo,
+}: MobileControlPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px 0',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 30%)',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          borderRadius: 20,
+          padding: '4px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
+        }}>
+          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+            {isExpanded ? '收起' : '控制面板'}
+          </Typography>
+          <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} style={{ display: 'flex', alignItems: 'center' }}>
+            <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
+          </motion.div>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+              {/* 标题 */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <Typography variant="h6" sx={{
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}>
+                  🌍 南北回归线
+                </Typography>
+                <Typography variant="h6" sx={{
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}>
+                  {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name}
+                </Typography>
+              </div>
+
+              {/* 季节选择 */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>选择节气</Typography>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {(Object.keys(SEASONS) as SeasonType[]).map(season => (
+                    <Chip
+                      key={season}
+                      label={`${SEASONS[season].emoji} ${SEASONS[season].name}`}
+                      onClick={() => {
+                        setCurrentSeason(season);
+                        setSunLatitude(SEASONS[season].sunLatitude);
+                      }}
+                      sx={{
+                        background: currentSeason === season 
+                          ? 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)' 
+                          : 'rgba(239, 68, 68, 0.1)',
+                        color: currentSeason === season ? 'white' : '#EF4444',
+                        fontWeight: 600,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* 直射点滑块 */}
+              <div style={{ background: 'rgba(251, 191, 36, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                <Typography variant="caption" color="text.secondary">太阳直射点纬度</Typography>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Typography variant="caption">23°S</Typography>
+                  <Slider
+                    value={sunLatitude}
+                    onChange={(_, v) => {
+                      const lat = v as number;
+                      setSunLatitude(lat);
+                      // 根据纬度同步更新季节
+                      if (lat > OBLIQUITY * 0.9) {
+                        setCurrentSeason('summer');
+                      } else if (lat < -OBLIQUITY * 0.9) {
+                        setCurrentSeason('winter');
+                      } else if (lat > 0) {
+                        setCurrentSeason('spring');
+                      } else {
+                        setCurrentSeason('autumn');
+                      }
+                    }}
+                    min={-OBLIQUITY}
+                    max={OBLIQUITY}
+                    step={0.5}
+                    sx={{
+                      flex: 1,
+                      '& .MuiSlider-thumb': { background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)' },
+                      '& .MuiSlider-track': { background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)' },
+                    }}
+                  />
+                  <Typography variant="caption">23°N</Typography>
+                </div>
+                <Typography variant="body2" sx={{ textAlign: 'center', mt: 1, fontWeight: 700, color: '#FBBF24' }}>
+                  {formatDegreeMinute(sunLatitude)}
+                </Typography>
+              </div>
+
+              {/* 图例 */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {[
+                  { color: COLORS.tropicOfCancer, label: '北回归线' },
+                  { color: COLORS.tropicOfCapricorn, label: '南回归线' },
+                  { color: COLORS.equator, label: '赤道' },
+                ].map(item => (
+                  <Chip
+                    key={item.label}
+                    label={item.label}
+                    size="small"
+                    sx={{
+                      background: `${item.color}20`,
+                      border: `1px solid ${item.color}40`,
+                      color: item.color,
+                      fontWeight: 500,
+                      fontSize: '11px',
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* 知识点 */}
+              <div
+                onClick={() => setShowInfo(!showInfo)}
+                style={{ background: 'rgba(245, 158, 11, 0.08)', borderRadius: 12, padding: 12, cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>💡 知识点</Typography>
+                  <motion.div animate={{ rotate: showInfo ? 180 : 0 }}>
+                    <ExpandMoreIcon sx={{ color: '#F59E0B', fontSize: 20 }} />
+                  </motion.div>
+                </div>
+                
+                <AnimatePresence>
+                  {showInfo && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                    >
+                      <div style={{ paddingTop: 8, fontSize: 13, lineHeight: 1.8 }}>
+                        <p style={{ margin: '0 0 4px' }}>
+                          <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射
+                        </p>
+                        <p style={{ margin: '0 0 4px' }}>
+                          <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射
+                        </p>
+                        <p style={{ margin: 0 }}>
+                          <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可直射区域
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ===================== 主组件 =====================
+
+export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isPortrait = useMediaQuery('(orientation: portrait)');
+  const isSmallScreen = useMediaQuery('(max-width: 600px)');
+  
+  const shouldShowLandscapePrompt = isSmallScreen && isPortrait;
+  
+  const [currentSeason, setCurrentSeason] = useState<SeasonType>('winter');
+  const [sunLatitude, setSunLatitude] = useState(SEASONS.winter.sunLatitude);
+  const [orbitProgress, setOrbitProgress] = useState(0); // 0-1，表示公转进度，0=冬至
+  const [autoRotate, setAutoRotate] = useState(true);
+  const [showLabels, setShowLabels] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [is3D, setIs3D] = useState(true);
+  const [dismissedLandscapePrompt, setDismissedLandscapePrompt] = useState(false);
+  const [isYearAnimating, setIsYearAnimating] = useState(false);
+  const cameraControllerRef = useRef<CameraControllerHandle>(null);
+  const animationRef = useRef<number | null>(null);
+  
+  const panelWidth = isPanelOpen ? 320 : 0;
+
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: isMobile ? 'column' : 'row',
+    height: isMobile ? '100vh' : 'calc(100vh - 120px)',
+    minHeight: isMobile ? '100vh' : '500px',
+    maxHeight: isMobile ? '100vh' : 'calc(100vh - 120px)',
+    position: 'relative',
+    overflow: 'hidden',
+  };
+
+  const sceneContainerStyle: React.CSSProperties = {
+    flex: 1,
+    height: isMobile ? '100%' : '100%',
+    minHeight: isMobile ? '100%' : 'auto',
+    marginRight: isMobile ? 0 : `${panelWidth + 40}px`,
+    transition: 'margin-right 0.3s ease',
+    paddingBottom: isMobile ? 60 : 0,
+  };
+
+  const controlButtonsStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: 16,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: 8,
+    background: 'rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: 12,
+    padding: 8,
+  };
+
+  // 当季节变化时更新直射点纬度和公转进度
+  const handleSeasonChange = (season: SeasonType) => {
+    setCurrentSeason(season);
+    setSunLatitude(SEASONS[season].sunLatitude);
+    // 设置对应的公转进度
+    // 坐标系：位置 = (cos(angle), 0, -sin(angle))，从北极俯视逆时针
+    // - 冬至: progress=0 → angle=0 → (+X, 0, 0) 右下 → 北极背离太阳 → 直射南回归线
+    // - 春分: progress=0.25 → angle=π/2 → (0, 0, -1) 右上 → 直射赤道
+    // - 夏至: progress=0.5 → angle=π → (-X, 0, 0) 左上 → 北极朝向太阳 → 直射北回归线
+    // - 秋分: progress=0.75 → angle=3π/2 → (0, 0, +1) 左下 → 直射赤道
+    const progressMap: Record<SeasonType, number> = {
+      winter: 0,
+      spring: 0.25,
+      summer: 0.5,
+      autumn: 0.75,
+    };
+    setOrbitProgress(progressMap[season]);
+    setIsYearAnimating(false); // 停止年循环动画
+  };
+
+  // 年循环动画 - 太阳直射点在南北回归线之间移动
+  useEffect(() => {
+    if (!isYearAnimating) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      return;
+    }
+
+    const startTime = Date.now();
+    const duration = 8000; // 8秒完成一个年周期
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = (elapsed % duration) / duration; // 0 to 1 循环
+      
+      // 设置公转进度
+      setOrbitProgress(progress);
+      
+      // 使用负余弦函数模拟太阳直射点的年变化
+      // progress: 0=冬至, 0.25=春分, 0.5=夏至, 0.75=秋分, 1=冬至
+      // 冬至时纬度最南(-OBLIQUITY)，夏至时纬度最北(+OBLIQUITY)
+      const latitude = -OBLIQUITY * Math.cos(progress * 2 * Math.PI);
+      
+      setSunLatitude(latitude);
+      
+      // 更新当前季节显示（基于progress而非latitude，更准确）
+      if (progress < 0.125 || progress >= 0.875) {
+        setCurrentSeason('winter');  // 冬至附近
+      } else if (progress >= 0.125 && progress < 0.375) {
+        setCurrentSeason('spring');  // 春分附近
+      } else if (progress >= 0.375 && progress < 0.625) {
+        setCurrentSeason('summer');  // 夏至附近
+      } else {
+        setCurrentSeason('autumn');  // 秋分附近
+      }
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isYearAnimating]);
+
+  // 切换年循环动画
+  const toggleYearAnimation = useCallback(() => {
+    setIsYearAnimating(prev => !prev);
+  }, []);
+
+  return (
+    <>
+      <AnimatePresence>
+        {shouldShowLandscapePrompt && !dismissedLandscapePrompt && (
+          <LandscapePrompt onDismiss={() => setDismissedLandscapePrompt(true)} />
+        )}
+      </AnimatePresence>
+
+      <div style={containerStyle}>
+        <div key={`scene-container-${isPanelOpen}`} style={sceneContainerStyle}>
+          <Card
+            component={motion.div}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            sx={{
+              height: '100%',
+              background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+              borderRadius: 4,
+              overflow: 'hidden',
+              position: 'relative',
+            }}
+          >
+            {is3D ? (
+              <Suspense fallback={
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
+                  <Typography color="white">🚀 加载 3D 场景中...</Typography>
+                  <LinearProgress sx={{ width: '50%' }} />
+                </div>
+              }>
+                <Canvas camera={{ position: [15, 12, 15], fov: 50 }} style={{ width: '100%', height: '100%' }}>
+                  <Scene 
+                    sunLatitude={sunLatitude} 
+                    orbitProgress={orbitProgress}
+                    showLabels={showLabels} 
+                    autoRotate={autoRotate} 
+                    isYearAnimating={isYearAnimating}
+                    cameraRef={cameraControllerRef} 
+                  />
+                </Canvas>
+              </Suspense>
+            ) : (
+              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                <TwoDView sunLatitude={sunLatitude} />
+              </div>
+            )}
+
+            <div style={controlButtonsStyle}>
+              {/* 年循环动画按钮 */}
+              <Tooltip title={isYearAnimating ? '⏸️ 暂停公转动画' : '▶️ 播放公转动画（观察直射点移动）'}>
+                <IconButton
+                  onClick={toggleYearAnimation}
+                  sx={{ 
+                    color: isYearAnimating ? '#FBBF24' : 'white', 
+                    '&:hover': { background: 'rgba(255,255,255,0.2)' },
+                    animation: isYearAnimating ? 'pulse 1s infinite' : 'none',
+                  }}
+                >
+                  <AnimationIcon />
+                </IconButton>
+              </Tooltip>
+              {is3D && (
+                <>
+                  <Tooltip title={autoRotate ? '暂停地球自转' : '开启地球自转'}>
+                    <IconButton
+                      onClick={() => setAutoRotate(!autoRotate)}
+                      sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                    >
+                      {autoRotate ? <PauseIcon /> : <PlayIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={showLabels ? '隐藏地球上的标签' : '显示地球上的标签'}>
+                    <IconButton
+                      onClick={() => setShowLabels(!showLabels)}
+                      sx={{ color: showLabels ? '#4ADE80' : 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                    >
+                      {showLabels ? <LabelIcon /> : <LabelOffIcon />}
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="重置视角">
+                    <IconButton
+                      onClick={() => cameraControllerRef.current?.reset()}
+                      sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                    >
+                      <ResetIcon />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              )}
+              <Tooltip title={is3D ? '切换到2D视图' : '切换到3D视图'}>
+                <IconButton
+                  onClick={() => setIs3D(!is3D)}
+                  sx={{ color: '#EF4444', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                >
+                  {is3D ? <TwoDIcon /> : <ThreeDIcon />}
+                </IconButton>
+              </Tooltip>
+            </div>
+
+            <Typography sx={{ position: 'absolute', top: 16, left: 16, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
+              {isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
+            </Typography>
+          </Card>
+        </div>
+
+        {/* 分隔条 */}
+        {!isMobile && (
+          <div
+            onClick={() => setIsPanelOpen(!isPanelOpen)}
+            style={{
+              position: 'absolute',
+              right: isPanelOpen ? panelWidth + 8 : 16,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '32px',
+              height: '80px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              background: isPanelOpen 
+                ? 'linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)'
+                : 'linear-gradient(180deg, #EF4444 0%, #F97316 100%)',
+              borderRadius: 8,
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              transition: 'right 0.3s ease, background 0.2s ease',
+            }}
+          >
+            <div style={{ color: isPanelOpen ? '#64748B' : 'white', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}>
+              {isPanelOpen ? <CollapseIcon /> : <ExpandIcon />}
+            </div>
+          </div>
+        )}
+
+        {/* 右侧控制面板 */}
+        {!isMobile && (
+          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: panelWidth, overflow: 'hidden', transition: 'width 0.3s ease' }}>
+            <Card sx={{
+              height: '100%',
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+              borderRadius: 4,
+              overflow: 'auto',
+              width: 320,
+              opacity: isPanelOpen ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+            }}>
+              <CardContent sx={{ p: 2 }}>
+                {/* 标题 */}
+                <div style={{ 
+                  marginBottom: 20,
+                  padding: 16,
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}>
+                  <Typography variant="h5" sx={{
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    mb: 0.5,
+                  }}>
+                    🌍 南北回归线
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Tropic of Cancer & Capricorn
+                  </Typography>
+                </div>
+
+                {/* 季节选择 */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#EF4444' }}>
+                    🗓️ 选择节气
+                  </Typography>
+                  
+                  <ToggleButtonGroup
+                    value={currentSeason}
+                    exclusive
+                    onChange={(_, value) => value && handleSeasonChange(value)}
+                    sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}
+                  >
+                    {(Object.keys(SEASONS) as SeasonType[]).map(season => (
+                      <ToggleButton 
+                        key={season} 
+                        value={season}
+                        sx={{
+                          flex: '1 1 45%',
+                          borderRadius: '8px !important',
+                          border: '1px solid rgba(239, 68, 68, 0.3) !important',
+                          '&.Mui-selected': {
+                            background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                            color: 'white',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #DC2626 0%, #EA580C 100%)',
+                            },
+                          },
+                        }}
+                      >
+                        {SEASONS[season].emoji} {SEASONS[season].name}
+                      </ToggleButton>
+                    ))}
+                  </ToggleButtonGroup>
+
+                  <div style={{ marginTop: 12, padding: 12, background: 'rgba(255,255,255,0.5)', borderRadius: 8 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#EF4444' }}>
+                      {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name} · {SEASONS[currentSeason].date}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {SEASONS[currentSeason].description}
+                    </Typography>
+                  </div>
+                </div>
+
+                {/* 直射点控制 */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 16,
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#FBBF24' }}>
+                    ☀️ 太阳直射点纬度
+                  </Typography>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <Typography variant="caption" color="text.secondary">23°S</Typography>
+                    <Slider
+                      value={sunLatitude}
+                      onChange={(_, v) => {
+                        const lat = v as number;
+                        setSunLatitude(lat);
+                        // 根据纬度同步更新季节和公转位置
+                        // 纬度范围: -23.43 (冬至) 到 +23.43 (夏至)
+                        // 使用反余弦计算对应的公转进度
+                        // latitude = -OBLIQUITY * cos(progress * 2π)
+                        // cos(progress * 2π) = -latitude / OBLIQUITY
+                        // progress * 2π = acos(-latitude / OBLIQUITY)
+                        // 注意：acos返回0到π，需要处理下半周期
+                        const normalizedLat = Math.max(-1, Math.min(1, -lat / OBLIQUITY));
+                        const angle = Math.acos(normalizedLat); // 0 到 π
+                        // 判断是在上半年还是下半年（春分到秋分 vs 秋分到春分）
+                        // 这里简化处理：假设在上半年（冬至→春分→夏至）
+                        const progress = angle / (2 * Math.PI);
+                        setOrbitProgress(progress);
+                        // 更新季节
+                        if (lat > OBLIQUITY * 0.9) {
+                          setCurrentSeason('summer');
+                        } else if (lat < -OBLIQUITY * 0.9) {
+                          setCurrentSeason('winter');
+                        } else if (Math.abs(lat) < OBLIQUITY * 0.1) {
+                          // 接近赤道，根据滑动方向判断是春分还是秋分
+                          // 简化：默认显示春分
+                          setCurrentSeason('spring');
+                        } else if (lat > 0) {
+                          setCurrentSeason('spring');
+                        } else {
+                          setCurrentSeason('autumn');
+                        }
+                        setIsYearAnimating(false);
+                      }}
+                      min={-OBLIQUITY}
+                      max={OBLIQUITY}
+                      step={0.5}
+                      marks={[
+                        { value: -OBLIQUITY, label: '' },
+                        { value: 0, label: '' },
+                        { value: OBLIQUITY, label: '' },
+                      ]}
+                      sx={{
+                        flex: 1,
+                        '& .MuiSlider-thumb': {
+                          background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+                          boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
+                        },
+                        '& .MuiSlider-track': {
+                          background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)',
+                        },
+                      }}
+                    />
+                    <Typography variant="caption" color="text.secondary">23°N</Typography>
+                  </div>
+
+                  <Typography variant="h4" sx={{
+                    textAlign: 'center',
+                    mt: 2,
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}>
+                    {formatDegreeMinute(sunLatitude)}
+                  </Typography>
+                </div>
+
+                {/* 图例 */}
+                <div style={{ 
+                  marginBottom: 16,
+                  padding: 16,
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.08) 100%)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#10B981' }}>
+                    📊 图例
+                  </Typography>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {[
+                      { color: COLORS.tropicOfCancer, label: '北回归线' },
+                      { color: COLORS.tropicOfCapricorn, label: '南回归线' },
+                      { color: COLORS.equator, label: '赤道' },
+                      { color: COLORS.arcticCircle, label: '北极圈' },
+                      { color: COLORS.antarcticCircle, label: '南极圈' },
+                      { color: COLORS.sunRay, label: '太阳直射' },
+                    ].map(item => (
+                      <Chip
+                        key={item.label}
+                        label={item.label}
+                        size="small"
+                        sx={{
+                          background: `linear-gradient(135deg, ${item.color}15 0%, ${item.color}25 100%)`,
+                          border: `1px solid ${item.color}40`,
+                          color: item.color,
+                          fontWeight: 500,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* 知识点 */}
+                <div style={{
+                  padding: 16,
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.08) 100%)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(245, 158, 11, 0.2)',
+                  marginBottom: 16,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
+                      💡 知识点
+                    </Typography>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setShowInfo(!showInfo)}
+                      sx={{ color: '#F59E0B', '&:hover': { background: 'rgba(245, 158, 11, 0.1)' } }}
+                    >
+                      <InfoIcon fontSize="small" />
+                    </IconButton>
+                  </div>
+
+                  <AnimatePresence>
+                    {showInfo && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                      >
+                        <div style={{ background: 'rgba(255, 255, 255, 0.6)', borderRadius: 8, padding: 12, fontSize: '13px', lineHeight: 1.8 }}>
+                          <p style={{ margin: '0 0 8px' }}>
+                            <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射最北界线
+                          </p>
+                          <p style={{ margin: '0 0 8px' }}>
+                            <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射最南界线
+                          </p>
+                          <p style={{ margin: '0 0 8px' }}>
+                            <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可以直射的区域
+                          </p>
+                          <p style={{ margin: '0 0 8px' }}>
+                            <strong style={{ color: '#4ADE80' }}>🔄 公转方向</strong>：从北极上空俯视，地球绕太阳逆时针公转
+                          </p>
+                          <p style={{ margin: 0 }}>
+                            <strong style={{ color: '#F59E0B' }}>回归线的意义</strong>：是热带与温带的分界线
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {!showInfo && (
+                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8, fontSize: '13px' }}>
+                      南北回归线是太阳直射的南北界限，纬度为 <strong style={{ color: '#F59E0B' }}>23°26′</strong>，与黄赤交角相等。
+                    </Typography>
+                  )}
+                </div>
+
+                {/* 试试看 */}
+                <div style={{
+                  padding: 16,
+                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(244, 114, 182, 0.08) 100%)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(236, 72, 153, 0.2)',
+                }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#EC4899' }}>
+                    🎯 试试看
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+                    • 切换到<strong style={{ color: '#EC4899' }}>夏至</strong>，观察直射点位置
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+                    • 滑动调节直射点，观察它只能在回归线之间移动
+                  </Typography>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* 移动端底部控制面板 */}
+        {isMobile && (
+          <MobileControlPanel
+            currentSeason={currentSeason}
+            setCurrentSeason={handleSeasonChange}
+            sunLatitude={sunLatitude}
+            setSunLatitude={setSunLatitude}
+            showInfo={showInfo}
+            setShowInfo={setShowInfo}
+          />
+        )}
+      </div>
+    </>
+  );
+}

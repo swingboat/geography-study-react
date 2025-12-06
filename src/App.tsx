@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Container, 
@@ -7,11 +7,15 @@ import {
   CardContent, 
   CardActionArea,
   Breadcrumbs,
-  Chip
+  Chip,
+  IconButton,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  NavigateNext as NavigateNextIcon
+  NavigateNext as NavigateNextIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
 
@@ -190,32 +194,65 @@ function HomePage() {
 
 // 黄赤交角页面
 function ObliquityPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: 32, paddingBottom: 32 }}>
-      <Container maxWidth="xl">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+      {/* 移动端固定返回按钮 */}
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+          }}
         >
-          <Breadcrumbs 
-            separator={<NavigateNextIcon fontSize="small" />} 
-            sx={{ mb: 3 }}
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5558E3 0%, #9747E8 100%)',
+              },
+            }}
           >
-            <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#667eea' }}>
-              <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
-              首页
-            </Link>
-            <Typography color="text.secondary">选修一</Typography>
-            <Typography sx={{ 
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 600
-            }}>黄赤交角</Typography>
-          </Breadcrumbs>
-        </motion.div>
+            <ArrowBackIcon />
+          </IconButton>
+        </div>
+      )}
+
+      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#667eea' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>黄赤交角</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
         
         <ObliquityOfEclipticDemo3D />
       </Container>

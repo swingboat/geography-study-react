@@ -1,0 +1,32 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Noto Sans SC', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 适合课堂投屏的样式 */
+@media (min-width: 1200px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+/* 平板适配 */
+@media (min-width: 768px) and (max-width: 1199px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 767px) {
+  html {
+    font-size: 14px;
+  }
+}

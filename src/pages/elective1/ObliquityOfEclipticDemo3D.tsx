@@ -1,0 +1,1018 @@
+/**
+ * 黄赤交角 3D 交互式动画组件
+ * 使用 Three.js + React Three Fiber 实现真 3D 效果
+ * 
+ * 面向高中生的现代化、活泼的教学动画
+ */
+
+import { useRef, useState, useMemo, Suspense, useImperativeHandle, forwardRef } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { 
+  OrbitControls, 
+  Stars, 
+  Line,
+  Html,
+  useTexture
+} from '@react-three/drei';
+import { motion, AnimatePresence } from 'framer-motion';
+import * as THREE from 'three';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Slider,
+  Chip,
+  useTheme,
+  useMediaQuery,
+  IconButton,
+  Tooltip,
+  LinearProgress,
+} from '@mui/material';
+import {
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+  RestartAlt as ResetIcon,
+  Info as InfoIcon,
+  ChevronLeft as CollapseIcon,
+  ChevronRight as ExpandIcon,
+  ThreeDRotation as ThreeDIcon,
+} from '@mui/icons-material';
+
+// ===================== 类型定义 =====================
+
+interface ObliquityDemo3DProps {
+  initialObliquity?: number;
+  minObliquity?: number;
+  maxObliquity?: number;
+}
+
+// ===================== 自定义图标 =====================
+
+/** 2D 旋转图标 - 模仿 ThreeDRotation 样式但显示 2D */
+const TwoDIcon = () => (
+  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+    {/* 旋转箭头 - 左下 */}
+    <path d="M7.52 21.48C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
+    {/* 旋转箭头 - 右上 */}
+    <path d="M16.48 2.52C19.75 4.06 22.09 7.24 22.45 11h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32z"/>
+    {/* 2D 文字 */}
+    <text x="6" y="16" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">2D</text>
+  </svg>
+);
+
+// ===================== 常量 =====================
+
+const COLORS = {
+  sun: '#FFD93D',
+  sunGlow: '#FFF3B0',
+  earth: '#4A90D9',
+  earthGreen: '#5CB85C',
+  orbit: '#6366F1',
+  eclipticPlane: '#10B981',
+  equatorPlane: '#F59E0B',
+  axis: '#EF4444',
+  angleArc: '#A855F7',
+  space: '#0F172A',
+};
+
+/** 格式化角度为度分格式 */
+const formatDegreeMinute = (value: number) => {
+  const degrees = Math.floor(value);
+  const minutes = Math.round((value - degrees) * 60);
+  return `${degrees}°${minutes}′`;
+};
+
+// ===================== 3D 组件 =====================
+
+/** 太阳组件 */
+function Sun() {
+  const sunRef = useRef<THREE.Mesh>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+
+  useFrame(({ clock }) => {
+    if (glowRef.current) {
+      glowRef.current.scale.setScalar(1 + Math.sin(clock.elapsedTime * 2) * 0.05);
+    }
+  });
+
+  return (
+    <group position={[0, 0, 0]}>
+      {/* 太阳光晕 */}
+      <mesh ref={glowRef}>
+        <sphereGeometry args={[1.8, 32, 32]} />
+        <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
+      </mesh>
+      
+      {/* 太阳主体 */}
+      <mesh ref={sunRef}>
+        <sphereGeometry args={[1.2, 64, 64]} />
+        <meshBasicMaterial color={COLORS.sun} />
+      </mesh>
+
+      {/* 太阳光源 */}
+      <pointLight intensity={2} distance={100} color={COLORS.sun} />
+      
+      {/* 太阳标签 */}
+      <Html position={[0, -2, 0]} center>
+        <div style={{ 
+          color: COLORS.sun, 
+          fontSize: '14px', 
+          fontWeight: 'bold',
+          textShadow: '0 0 10px rgba(255,217,61,0.8)',
+          whiteSpace: 'nowrap'
+        }}>
+          ☀️ 太阳
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** 地球组件 - 带真实地图纹理 */
+interface EarthProps {
+  position: [number, number, number];
+  obliquity: number;
+  showLabels: boolean;
+}
+
+function Earth({ position, obliquity, showLabels }: EarthProps) {
+  const earthRef = useRef<THREE.Group>(null);
+  const earthMeshRef = useRef<THREE.Mesh>(null);
+  const obliquityRad = (obliquity * Math.PI) / 180;
+
+  // 加载地球纹理 - 使用本地文件
+  const [earthMap, earthNormal, earthSpec, cloudsMap] = useTexture([
+    '/textures/earth.jpg',
+    '/textures/earth_normal.jpg',
+    '/textures/earth_specular.jpg',
+    '/textures/earth_clouds.png',
+  ]);
+
+  // 地球自转
+  useFrame(({ clock }) => {
+    if (earthMeshRef.current) {
+      earthMeshRef.current.rotation.y = clock.elapsedTime * 0.3;
+    }
+  });
+
+  // 地轴方向（保持倾斜）
+  const axisTop = new THREE.Vector3(
+    Math.sin(obliquityRad) * 2,
+    Math.cos(obliquityRad) * 2,
+    0
+  );
+  const axisBottom = new THREE.Vector3(
+    -Math.sin(obliquityRad) * 2,
+    -Math.cos(obliquityRad) * 2,
+    0
+  );
+
+  return (
+    <group position={position} ref={earthRef}>
+      {/* 地球主体 - 带真实纹理 */}
+      <group rotation={[0, 0, obliquityRad]}>
+        <mesh ref={earthMeshRef}>
+          <sphereGeometry args={[0.8, 64, 64]} />
+          <meshStandardMaterial
+            map={earthMap}
+            normalMap={earthNormal}
+            normalScale={new THREE.Vector2(0.5, 0.5)}
+            roughnessMap={earthSpec}
+            roughness={0.5}
+            metalness={0.1}
+          />
+        </mesh>
+        
+        {/* 云层 */}
+        <mesh>
+          <sphereGeometry args={[0.82, 64, 64]} />
+          <meshBasicMaterial
+            map={cloudsMap}
+            transparent
+            opacity={0.2}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {/* 大气层光晕 */}
+        <mesh>
+          <sphereGeometry args={[0.88, 64, 64]} />
+          <meshBasicMaterial
+            color="#88CCFF"
+            transparent
+            opacity={0.15}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      </group>
+
+      {/* 地轴 */}
+      <Line
+        points={[axisBottom.toArray(), axisTop.toArray()]}
+        color={COLORS.axis}
+        lineWidth={3}
+      />
+      
+      {/* 北极点 */}
+      <mesh position={axisTop.toArray()}>
+        <sphereGeometry args={[0.1, 16, 16]} />
+        <meshBasicMaterial color={COLORS.axis} />
+      </mesh>
+
+      {/* 黄道面（水平圆盘） */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[1.8, 64]} />
+        <meshBasicMaterial 
+          color={COLORS.eclipticPlane} 
+          transparent 
+          opacity={0.25} 
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* 黄道面边缘线 */}
+      <Line
+        points={Array.from({ length: 65 }, (_, i) => {
+          const angle = (i / 64) * Math.PI * 2;
+          return [Math.cos(angle) * 1.8, 0, Math.sin(angle) * 1.8];
+        })}
+        color={COLORS.eclipticPlane}
+        lineWidth={2}
+      />
+
+      {/* 赤道面（倾斜圆盘） - 与地轴垂直 */}
+      {/* 地轴向右上倾斜，赤道面应向右下倾斜 */}
+      <mesh rotation={[-Math.PI / 2, 0, -obliquityRad]}>
+        <circleGeometry args={[1.5, 64]} />
+        <meshBasicMaterial 
+          color={COLORS.equatorPlane} 
+          transparent 
+          opacity={0.25} 
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* 赤道面边缘线 - 与地轴垂直的圆 */}
+      <Line
+        points={Array.from({ length: 65 }, (_, i) => {
+          const angle = (i / 64) * Math.PI * 2;
+          // 先在XZ平面画圆，然后绕Z轴旋转-obliquityRad（向右下倾斜）
+          const x0 = Math.cos(angle) * 1.5;
+          const y0 = 0;
+          const z0 = Math.sin(angle) * 1.5;
+          // 绕Z轴旋转（负角度，向右下倾斜）
+          const x = x0 * Math.cos(-obliquityRad) - y0 * Math.sin(-obliquityRad);
+          const y = x0 * Math.sin(-obliquityRad) + y0 * Math.cos(-obliquityRad);
+          const z = z0;
+          return [x, y, z];
+        })}
+        color={COLORS.equatorPlane}
+        lineWidth={2}
+      />
+
+      {/* 标签 */}
+      {showLabels && (
+        <>
+          <Html position={[2.2, 0, 0]} center>
+            <div style={{ color: COLORS.eclipticPlane, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+              黄道面
+            </div>
+          </Html>
+          <Html position={[2.2 * Math.cos(obliquityRad), 2.2 * Math.sin(obliquityRad), 0]} center>
+            <div style={{ color: COLORS.equatorPlane, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+              赤道面
+            </div>
+          </Html>
+          <Html position={[axisTop.x + 0.3, axisTop.y + 0.3, 0]} center>
+            <div style={{ color: COLORS.axis, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+              N极
+            </div>
+          </Html>
+          <Html position={[1.3, -0.8, 0]} center>
+            <div style={{ 
+              color: COLORS.angleArc, 
+              fontSize: '14px', 
+              fontWeight: 'bold',
+              background: 'rgba(168, 85, 247, 0.2)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap'
+            }}>
+              {formatDegreeMinute(obliquity)}
+            </div>
+          </Html>
+        </>
+      )}
+
+    </group>
+  );
+}
+
+/** 轨道组件 */
+function Orbit({ radius }: { radius: number }) {
+  const points = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 64; i++) {
+      const angle = (i / 64) * Math.PI * 2;
+      pts.push(new THREE.Vector3(
+        Math.cos(angle) * radius,
+        0,
+        Math.sin(angle) * radius
+      ));
+    }
+    return pts;
+  }, [radius]);
+
+  return (
+    <Line
+      points={points}
+      color={COLORS.orbit}
+      lineWidth={1}
+      dashed
+      dashSize={0.5}
+      gapSize={0.3}
+    />
+  );
+}
+
+/** 相机控制器 - 用于重置视角 */
+interface CameraControllerHandle {
+  reset: () => void;
+}
+
+const CameraController = forwardRef<CameraControllerHandle>((_, ref) => {
+  const { camera } = useThree();
+  const controlsRef = useRef<any>(null);
+  
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      camera.position.set(15, 10, 15);
+      camera.lookAt(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.reset();
+      }
+    }
+  }));
+  
+  return (
+    <OrbitControls 
+      ref={controlsRef}
+      enablePan={false}
+      minDistance={5}
+      maxDistance={30}
+    />
+  );
+});
+
+/** 场景组件 */
+interface SceneProps {
+  obliquity: number;
+  isPlaying: boolean;
+  showLabels: boolean;
+  cameraRef: React.RefObject<CameraControllerHandle>;
+}
+
+function Scene({ obliquity, isPlaying, showLabels, cameraRef }: SceneProps) {
+  const orbitRadius = 8;
+  const [orbitAngle, setOrbitAngle] = useState(0);
+
+  useFrame((_, delta) => {
+    if (isPlaying) {
+      setOrbitAngle(prev => (prev + delta * 0.3) % (Math.PI * 2));
+    }
+  });
+
+  const earthPosition: [number, number, number] = [
+    Math.cos(orbitAngle) * orbitRadius,
+    0,
+    Math.sin(orbitAngle) * orbitRadius
+  ];
+
+  return (
+    <>
+      {/* 环境 */}
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[5, 3, 5]} intensity={0.8} />
+      <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
+      
+      {/* 太阳 */}
+      <Sun />
+      
+      {/* 轨道 */}
+      <Orbit radius={orbitRadius} />
+      
+      {/* 黄道面可视化（半透明圆盘） */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <ringGeometry args={[3, orbitRadius + 2, 64]} />
+        <meshBasicMaterial 
+          color={COLORS.eclipticPlane} 
+          transparent 
+          opacity={0.05} 
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* 地球 */}
+      <Earth position={earthPosition} obliquity={obliquity} showLabels={showLabels} />
+      
+      {/* 相机控制 */}
+      <CameraController ref={cameraRef} />
+    </>
+  );
+}
+
+// ===================== 2D 视图组件 =====================
+
+/** 2D SVG 视图 */
+function TwoDView({ obliquity }: { obliquity: number }) {
+  const obliquityRad = (obliquity * Math.PI) / 180;
+  const cx = 200; // 中心 x
+  const cy = 200; // 中心 y
+  const earthRadius = 60;
+  const axisLength = 100;
+  
+  // 地轴端点
+  const axisTopX = cx + Math.sin(obliquityRad) * axisLength;
+  const axisTopY = cy - Math.cos(obliquityRad) * axisLength;
+  const axisBottomX = cx - Math.sin(obliquityRad) * axisLength;
+  const axisBottomY = cy + Math.cos(obliquityRad) * axisLength;
+  
+  // 赤道线端点（与地轴垂直）
+  const equatorHalfLen = 80;
+  const equatorX1 = cx + Math.cos(obliquityRad) * equatorHalfLen;
+  const equatorY1 = cy + Math.sin(obliquityRad) * equatorHalfLen;
+  const equatorX2 = cx - Math.cos(obliquityRad) * equatorHalfLen;
+  const equatorY2 = cy - Math.sin(obliquityRad) * equatorHalfLen;
+
+  // 角度弧线路径
+  const arcRadius = 40;
+  const arcPath = `M ${cx} ${cy - arcRadius} A ${arcRadius} ${arcRadius} 0 0 1 ${cx + Math.sin(obliquityRad) * arcRadius} ${cy - Math.cos(obliquityRad) * arcRadius}`;
+
+  return (
+    <svg width="400" height="400" viewBox="0 0 400 400" style={{ maxWidth: '100%', maxHeight: '100%' }}>
+      {/* 背景 */}
+      <rect width="400" height="400" fill="transparent" />
+      
+      {/* 黄道面（水平线） */}
+      <line 
+        x1="50" y1={cy} 
+        x2="350" y2={cy} 
+        stroke={COLORS.eclipticPlane} 
+        strokeWidth="3" 
+        strokeDasharray="10,5"
+      />
+      <text x="355" y={cy + 5} fill={COLORS.eclipticPlane} fontSize="14" fontWeight="bold">黄道面</text>
+      
+      {/* 赤道面（倾斜线） */}
+      <line 
+        x1={equatorX2} y1={equatorY2} 
+        x2={equatorX1} y2={equatorY1} 
+        stroke={COLORS.equatorPlane} 
+        strokeWidth="3" 
+        strokeDasharray="10,5"
+      />
+      <text x={equatorX1 + 10} y={equatorY1} fill={COLORS.equatorPlane} fontSize="14" fontWeight="bold">赤道面</text>
+      
+      {/* 地球 */}
+      <circle cx={cx} cy={cy} r={earthRadius} fill={COLORS.earth} />
+      <ellipse 
+        cx={cx} cy={cy} 
+        rx={earthRadius} ry={earthRadius * 0.3} 
+        fill="none" 
+        stroke="rgba(255,255,255,0.3)" 
+        strokeWidth="1"
+        transform={`rotate(${obliquity}, ${cx}, ${cy})`}
+      />
+      
+      {/* 地轴 */}
+      <line 
+        x1={axisBottomX} y1={axisBottomY} 
+        x2={axisTopX} y2={axisTopY} 
+        stroke={COLORS.axis} 
+        strokeWidth="3"
+      />
+      {/* 北极点 */}
+      <circle cx={axisTopX} cy={axisTopY} r="6" fill={COLORS.axis} />
+      <text x={axisTopX + 10} y={axisTopY} fill={COLORS.axis} fontSize="14" fontWeight="bold">N</text>
+      
+      {/* 黄赤交角弧线 */}
+      <path 
+        d={arcPath} 
+        fill="none" 
+        stroke={COLORS.angleArc} 
+        strokeWidth="3"
+      />
+      
+      {/* 角度标注 */}
+      <text 
+        x={cx + 50} 
+        y={cy - 50} 
+        fill={COLORS.angleArc} 
+        fontSize="18" 
+        fontWeight="bold"
+      >
+        {formatDegreeMinute(obliquity)}
+      </text>
+      
+      {/* 垂直参考线（虚线） */}
+      <line 
+        x1={cx} y1={cy - 120} 
+        x2={cx} y2={cy + 120} 
+        stroke="rgba(255,255,255,0.2)" 
+        strokeWidth="1" 
+        strokeDasharray="5,5"
+      />
+      
+      {/* 图例 */}
+      <g transform="translate(20, 320)">
+        <rect x="0" y="0" width="20" height="3" fill={COLORS.eclipticPlane} />
+        <text x="25" y="5" fill="white" fontSize="12">黄道面</text>
+        
+        <rect x="0" y="20" width="20" height="3" fill={COLORS.equatorPlane} />
+        <text x="25" y="25" fill="white" fontSize="12">赤道面</text>
+        
+        <rect x="0" y="40" width="20" height="3" fill={COLORS.axis} />
+        <text x="25" y="45" fill="white" fontSize="12">地轴</text>
+        
+        <rect x="0" y="60" width="20" height="3" fill={COLORS.angleArc} />
+        <text x="25" y="65" fill="white" fontSize="12">黄赤交角</text>
+      </g>
+    </svg>
+  );
+}
+
+// ===================== 主组件 =====================
+
+export default function ObliquityOfEclipticDemo3D({
+  initialObliquity = 23 + 26/60,  // 23°26′
+  minObliquity = 0,
+  maxObliquity = 30,
+}: ObliquityDemo3DProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  const [obliquity, setObliquity] = useState(initialObliquity);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [showLabels] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(true); // 右侧面板是否展开
+  const [is3D, setIs3D] = useState(true); // 3D/2D视图切换
+  const cameraControllerRef = useRef<CameraControllerHandle>(null);
+  
+  const panelWidth = isPanelOpen ? 320 : 0;
+
+  const containerStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: isMobile ? 'column' : 'row',
+    height: isMobile ? 'auto' : 'calc(100vh - 120px)',
+    minHeight: isMobile ? '400px' : '500px',
+    maxHeight: isMobile ? 'none' : 'calc(100vh - 120px)',
+    position: 'relative',
+  };
+
+  const sceneContainerStyle: React.CSSProperties = {
+    flex: 1,
+    height: '100%',
+    minHeight: isMobile ? '400px' : 'auto',
+    marginRight: isMobile ? 0 : `${panelWidth + 40}px`,
+    transition: 'margin-right 0.3s ease',
+  };
+
+  const controlButtonsStyle: React.CSSProperties = {
+    position: 'absolute',
+    bottom: 16,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    display: 'flex',
+    gap: 8,
+    background: 'rgba(255,255,255,0.1)',
+    backdropFilter: 'blur(10px)',
+    borderRadius: 12,
+    padding: 8,
+  };
+
+  return (
+    <div style={containerStyle}>
+      {/* 左侧：3D 场景 */}
+      <div
+        key={`scene-container-${isPanelOpen}`}
+        style={sceneContainerStyle}
+      >
+        <Card
+          component={motion.div}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          sx={{
+            height: '100%',
+            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+            borderRadius: 4,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          {/* 3D/2D 视图切换 */}
+          {is3D ? (
+            <Suspense fallback={
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                height: '100%',
+                flexDirection: 'column',
+                gap: 16
+              }}>
+                <Typography color="white">🚀 加载 3D 场景中...</Typography>
+                <LinearProgress sx={{ width: '50%' }} />
+              </div>
+            }>
+              <Canvas
+                camera={{ position: [15, 10, 15], fov: 45 }}
+                style={{ width: '100%', height: '100%' }}
+              >
+                <Scene obliquity={obliquity} isPlaying={isPlaying} showLabels={showLabels} cameraRef={cameraControllerRef} />
+              </Canvas>
+            </Suspense>
+          ) : (
+            <div style={{ 
+              width: '100%', 
+              height: '100%', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              padding: 16,
+            }}>
+              <TwoDView obliquity={obliquity} />
+            </div>
+          )}
+
+          {/* 控制按钮覆盖层 */}
+          <div style={controlButtonsStyle}>
+            {/* 3D 模式：播放/暂停、重置视角、切换2D */}
+            {is3D && (
+              <>
+                <Tooltip title={isPlaying ? '暂停' : '播放'}>
+                  <IconButton
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                  >
+                    {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="重置视角">
+                  <IconButton
+                    onClick={() => cameraControllerRef.current?.reset()}
+                    sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                  >
+                    <ResetIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {/* 2D 模式：重置角度 */}
+            {!is3D && (
+              <Tooltip title="重置角度">
+                <IconButton
+                  onClick={() => setObliquity(initialObliquity)}
+                  sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                >
+                  <ResetIcon />
+                </IconButton>
+              </Tooltip>
+            )}
+            {/* 切换 2D/3D */}
+            <Tooltip title={is3D ? '切换到2D视图' : '切换到3D视图'}>
+              <IconButton
+                onClick={() => setIs3D(!is3D)}
+                sx={{ 
+                  color: '#A855F7',
+                  '&:hover': { background: 'rgba(255,255,255,0.2)' } 
+                }}
+              >
+                {is3D ? <TwoDIcon /> : <ThreeDIcon />}
+              </IconButton>
+            </Tooltip>
+          </div>
+
+          {/* 提示文字 */}
+          <Typography
+            sx={{
+              position: 'absolute',
+              top: 16,
+              left: 16,
+              color: 'rgba(255,255,255,0.6)',
+              fontSize: '12px',
+            }}
+          >
+            🖱️ 拖拽旋转 | 滚轮缩放
+          </Typography>
+        </Card>
+      </div>
+
+      {/* 分隔条 - 点击展开/收起，使用固定定位确保始终可见 */}
+      {!isMobile && (
+        <div
+          onClick={() => setIsPanelOpen(!isPanelOpen)}
+          style={{
+            position: 'absolute',
+            right: isPanelOpen ? panelWidth + 8 : 16,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: '32px',
+            height: '80px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            background: isPanelOpen 
+              ? 'linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)'
+              : 'linear-gradient(180deg, #6366F1 0%, #A855F7 100%)',
+            borderRadius: 8,
+            zIndex: 1000,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            transition: 'right 0.3s ease, background 0.2s ease',
+          }}
+        >
+          <div 
+            style={{ 
+              color: isPanelOpen ? '#64748B' : 'white',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'color 0.2s ease',
+            }}
+          >
+            {isPanelOpen ? <CollapseIcon /> : <ExpandIcon />}
+          </div>
+        </div>
+      )}
+
+      {/* 右侧：控制面板 */}
+      <div
+        style={{ 
+          position: 'absolute',
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: panelWidth,
+          overflow: 'hidden',
+          transition: 'width 0.3s ease',
+        }}
+      >
+        <Card
+          sx={{
+            height: '100%',
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+            borderRadius: 4,
+            overflow: 'auto',
+            width: 320,
+            opacity: isPanelOpen ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+          }}
+        >
+          <CardContent sx={{ p: 2 }}>
+            {/* 标题 */}
+            <div style={{ 
+              marginBottom: 20,
+              padding: 16,
+              background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+              borderRadius: 12,
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+            }}>
+              <Typography
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  mb: 0.5,
+                }}
+              >
+                🌍 黄赤交角
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Obliquity of the Ecliptic
+              </Typography>
+            </div>
+
+            {/* 倾角控制 */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%)',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 16,
+                border: '1px solid rgba(14, 165, 233, 0.2)',
+                boxShadow: '0 2px 8px rgba(14, 165, 233, 0.1)',
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#0EA5E9' }}>
+                🎮 调节地轴倾角
+              </Typography>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Typography variant="caption" color="text.secondary">{minObliquity}°</Typography>
+                <Slider
+                  value={obliquity}
+                  onChange={(_, v) => setObliquity(v as number)}
+                  min={minObliquity}
+                  max={maxObliquity}
+                  step={0.1}
+                  sx={{
+                    flex: 1,
+                    '& .MuiSlider-thumb': {
+                      background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                      boxShadow: '0 2px 8px rgba(99, 102, 241, 0.4)',
+                    },
+                    '& .MuiSlider-track': {
+                      background: 'linear-gradient(90deg, #6366F1 0%, #A855F7 100%)',
+                    },
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary">{maxObliquity}°</Typography>
+                <Tooltip title="重置为 23°26′">
+                  <IconButton
+                    size="small"
+                    onClick={() => setObliquity(23 + 26/60)}
+                    sx={{
+                      color: '#6366F1',
+                      '&:hover': { background: 'rgba(99, 102, 241, 0.1)' },
+                    }}
+                  >
+                    <ResetIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </div>
+
+              <Typography
+                variant="h4"
+                sx={{
+                  textAlign: 'center',
+                  mt: 2,
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                {formatDegreeMinute(obliquity)}
+              </Typography>
+
+              {Math.abs(obliquity - (23 + 26/60)) < 0.5 && (
+                <Chip
+                  label="✨ 接近真实值！(约23°26′)"
+                  size="small"
+                  sx={{ 
+                    mt: 1, 
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+                    color: 'white',
+                    fontWeight: 500,
+                  }}
+                />
+              )}
+            </div>
+
+            {/* 图例 */}
+            <div style={{ 
+              marginBottom: 16,
+              padding: 16,
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.08) 100%)',
+              borderRadius: 12,
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)',
+            }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#10B981' }}>
+                📊 图例
+              </Typography>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[
+                  { color: COLORS.eclipticPlane, label: '黄道面' },
+                  { color: COLORS.equatorPlane, label: '赤道面' },
+                  { color: COLORS.axis, label: '地轴' },
+                  { color: COLORS.angleArc, label: '黄赤交角' },
+                ].map(item => (
+                  <Chip
+                    key={item.label}
+                    label={item.label}
+                    size="small"
+                    sx={{
+                      background: `linear-gradient(135deg, ${item.color}15 0%, ${item.color}25 100%)`,
+                      border: `1px solid ${item.color}40`,
+                      color: item.color,
+                      fontWeight: 500,
+                      '& .MuiChip-label': {
+                        textShadow: `0 0 20px ${item.color}`,
+                      },
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* 知识点 */}
+            <div style={{
+              padding: 16,
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.08) 100%)',
+              borderRadius: 12,
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.1)',
+              marginBottom: 16,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
+                  💡 知识点
+                </Typography>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setShowInfo(!showInfo)}
+                  sx={{ 
+                    color: '#F59E0B',
+                    '&:hover': { background: 'rgba(245, 158, 11, 0.1)' },
+                  }}
+                >
+                  <InfoIcon fontSize="small" />
+                </IconButton>
+              </div>
+
+              <AnimatePresence>
+                {showInfo && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <div style={{ 
+                      background: 'rgba(255, 255, 255, 0.6)', 
+                      borderRadius: 8, 
+                      padding: 12,
+                      fontSize: '13px',
+                      lineHeight: 1.8,
+                      backdropFilter: 'blur(10px)',
+                    }}>
+                      <p style={{ margin: '0 0 8px' }}>
+                        <strong style={{ color: COLORS.eclipticPlane }}>黄道面</strong>：地球绕太阳公转的轨道平面
+                      </p>
+                      <p style={{ margin: '0 0 8px' }}>
+                        <strong style={{ color: COLORS.equatorPlane }}>赤道面</strong>：与地轴垂直，过地心的平面
+                      </p>
+                      <p style={{ margin: 0 }}>
+                        <strong style={{ color: COLORS.angleArc }}>黄赤交角</strong>：约 23°26′，决定了四季变化
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {!showInfo && (
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8, fontSize: '13px' }}>
+                  地轴倾斜约 <strong style={{ color: '#F59E0B' }}>23°26′</strong>，使太阳直射点在南北回归线之间移动，形成四季。
+                </Typography>
+              )}
+            </div>
+
+            {/* 观察视角说明 */}
+            <div
+              style={{
+                padding: 16,
+                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)',
+                borderRadius: 12,
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                boxShadow: '0 2px 8px rgba(139, 92, 246, 0.1)',
+                marginBottom: 16,
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#8B5CF6' }}>
+                👁️ 观察视角
+              </Typography>
+              <Typography variant="body2" sx={{ lineHeight: 1.8, fontSize: '13px', color: 'text.secondary' }}>
+                我们从太阳系的<strong style={{ color: '#8B5CF6' }}>右上方斜上方</strong>俯视整个场景，可以同时看到太阳、地球公转轨道、地轴倾斜以及黄道面与赤道面的夹角。
+              </Typography>
+            </div>
+
+            {/* 操作提示 */}
+            <div
+              style={{
+                padding: 16,
+                background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(244, 114, 182, 0.08) 100%)',
+                borderRadius: 12,
+                border: '1px solid rgba(236, 72, 153, 0.2)',
+                boxShadow: '0 2px 8px rgba(236, 72, 153, 0.1)',
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#EC4899' }}>
+                🎯 试试看
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+                • 把倾角调到 <strong style={{ color: '#EC4899' }}>0°</strong>，看看会怎样？
+              </Typography>
+              <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+                • 真实地球倾角是 <strong style={{ color: '#EC4899' }}>23°26′</strong>
+              </Typography>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

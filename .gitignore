@@ -1,0 +1,43 @@
+# 依赖目录
+node_modules/
+weapp/node_modules/
+
+# 构建输出
+dist/
+weapp/dist/
+
+# 本地环境配置
+.env
+.env.local
+.env.*.local
+
+# 编辑器配置
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript 缓存
+*.tsbuildinfo
+
+# 测试覆盖率
+coverage/
+
+# Playwright
+.playwright-mcp/
+
+# 微信小程序开发工具
+project.private.config.json

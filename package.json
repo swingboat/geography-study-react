@@ -1,0 +1,45 @@
+{
+  "name": "geography-study-react",
+  "version": "1.0.0",
+  "description": "高中地理动画教学 - React 多端应用（Web + 微信小程序）",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:h5": "vite",
+    "build": "tsc -b && vite build",
+    "build:h5": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "weapp:install": "cd weapp && npm install",
+    "weapp:dev": "cd weapp && npm run dev:weapp",
+    "weapp:build": "cd weapp && npm run build:weapp"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.4",
+    "@emotion/styled": "^11.11.5",
+    "@mui/icons-material": "^5.15.20",
+    "@mui/material": "^5.15.20",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
+    "@types/three": "^0.181.0",
+    "framer-motion": "^12.23.25",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.2",
+    "three": "^0.181.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "globals": "^15.9.0",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.0.1",
+    "vite": "^5.4.1"
+  }
+}

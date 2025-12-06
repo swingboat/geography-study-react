@@ -1,0 +1,1 @@
+export { TwoDIcon } from './TwoDIcon';

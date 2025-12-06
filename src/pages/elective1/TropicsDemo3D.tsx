@@ -5,10 +5,9 @@
  * 面向高中生的现代化、活泼的教学动画
  */
 
-import { useRef, useState, useMemo, Suspense, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useRef, useState, useMemo, Suspense, useEffect, useCallback } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { 
-  OrbitControls, 
   Stars, 
   Line,
   Html,
@@ -45,97 +44,40 @@ import {
   SlowMotionVideo as AnimationIcon,
 } from '@mui/icons-material';
 
+// 导入公共组件和工具
+import {
+  OBLIQUITY,
+  ORBIT_RADIUS,
+  ASTRONOMY_COLORS,
+  SEASONS,
+  SEASON_PROGRESS_MAP,
+  type SeasonType,
+} from '../../shared/constants';
+import { formatDegreeMinute } from '../../shared/utils';
+import {
+  TwoDIcon,
+  Sun,
+  OrbitPath,
+  SeasonMarkers,
+  LatitudeLine,
+  CameraController,
+  type CameraControllerHandle,
+} from '../../shared/components';
+
 // ===================== 类型定义 =====================
 
 interface TropicsDemo3DProps {
   initialObliquity?: number;
 }
 
-type SeasonType = 'summer' | 'winter' | 'spring' | 'autumn';
-
-// ===================== 自定义图标 =====================
-
-/** 2D 旋转图标 */
-const TwoDIcon = () => (
-  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-    <path d="M7.52 21.48C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
-    <path d="M16.48 2.52C19.75 4.06 22.09 7.24 22.45 11h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32z"/>
-    <text x="6" y="16" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">2D</text>
-  </svg>
-);
-
-// ===================== 常量 =====================
+// ===================== 本地常量（特定于此组件） =====================
 
 const COLORS = {
-  sun: '#FFD93D',
-  sunGlow: '#FFF3B0',
-  earth: '#4A90D9',
-  tropicOfCancer: '#EF4444',      // 北回归线 - 红色
-  tropicOfCapricorn: '#3B82F6',   // 南回归线 - 蓝色
-  equator: '#10B981',             // 赤道 - 绿色
-  arcticCircle: '#F97316',        // 北极圈 - 橙色
-  antarcticCircle: '#8B5CF6',     // 南极圈 - 紫色
-  sunRay: '#FBBF24',              // 太阳光线
-  axis: '#94A3B8',
-  space: '#0F172A',
+  ...ASTRONOMY_COLORS,
+  // 可以在这里覆盖或添加特定颜色
 };
 
-const OBLIQUITY = 23 + 26/60; // 23°26′
-
-/** 格式化角度为度分格式 */
-const formatDegreeMinute = (value: number) => {
-  const degrees = Math.floor(Math.abs(value));
-  const minutes = Math.round((Math.abs(value) - degrees) * 60);
-  // 纬度为0时（赤道）不显示N/S
-  if (Math.abs(value) < 0.01) {
-    return `${degrees}°${minutes}′`;
-  }
-  const sign = value > 0 ? 'N' : 'S';
-  return `${degrees}°${minutes}′${sign}`;
-};
-
-/** 季节配置 */
-const SEASONS: Record<SeasonType, { 
-  name: string; 
-  date: string; 
-  sunLatitude: number; 
-  description: string;
-  emoji: string;
-}> = {
-  spring: {
-    name: '春分',
-    date: '3月21日前后',
-    sunLatitude: 0,
-    description: '太阳直射赤道，全球昼夜等长',
-    emoji: '🌸',
-  },
-  summer: {
-    name: '夏至',
-    date: '6月21日前后',
-    sunLatitude: OBLIQUITY,
-    description: '太阳直射北回归线，北半球白昼最长',
-    emoji: '☀️',
-  },
-  autumn: {
-    name: '秋分',
-    date: '9月23日前后',
-    sunLatitude: 0,
-    description: '太阳直射赤道，全球昼夜等长',
-    emoji: '🍂',
-  },
-  winter: {
-    name: '冬至',
-    date: '12月22日前后',
-    sunLatitude: -OBLIQUITY,
-    description: '太阳直射南回归线，北半球白昼最短',
-    emoji: '❄️',
-  },
-};
-
-// ===================== 3D 组件 =====================
-
-/** 公转轨道半径 */
-const ORBIT_RADIUS = 8;
+// ===================== 本地 3D 组件（特定于此演示） =====================
 
 /** 太阳光线组件 - 从太阳射向地球 */
 function SunRays({ earthPosition }: { earthPosition: [number, number, number] }) {
@@ -232,69 +174,7 @@ function SunRays({ earthPosition }: { earthPosition: [number, number, number] })
   );
 }
 
-/** 纬线圈组件 */
-function LatitudeLine({ 
-  latitude, 
-  radius, 
-  color, 
-  label, 
-  showLabel = true,
-  dashed = false 
-}: { 
-  latitude: number; 
-  radius: number; 
-  color: string; 
-  label: string;
-  showLabel?: boolean;
-  dashed?: boolean;
-}) {
-  const latRad = (latitude * Math.PI) / 180;
-  const y = Math.sin(latRad) * radius;
-  const circleRadius = Math.cos(latRad) * radius;
-
-  const points = useMemo(() => {
-    const pts: [number, number, number][] = [];
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2;
-      pts.push([
-        Math.cos(angle) * circleRadius,
-        y,
-        Math.sin(angle) * circleRadius
-      ]);
-    }
-    return pts;
-  }, [circleRadius, y]);
-
-  return (
-    <group>
-      <Line
-        points={points}
-        color={color}
-        lineWidth={2}
-        dashed={dashed}
-        dashSize={0.1}
-        gapSize={0.05}
-      />
-      {showLabel && (
-        <Html position={[circleRadius + 0.3, y, 0]} center>
-          <div style={{ 
-            color: color, 
-            fontSize: '11px', 
-            fontWeight: 'bold',
-            whiteSpace: 'nowrap',
-            background: 'rgba(0,0,0,0.5)',
-            padding: '2px 6px',
-            borderRadius: 4,
-          }}>
-            {label}
-          </div>
-        </Html>
-      )}
-    </group>
-  );
-}
-
-/** 地球组件 - 带纬线 */
+/** 地球组件 - 带纬线（特定于此演示，使用本地 LatitudeLine 组件） */
 interface EarthProps {
   sunLatitude: number;
   showLabels: boolean;
@@ -479,111 +359,6 @@ function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthPr
   );
 }
 
-/** 太阳组件 */
-function Sun() {
-  const glowRef = useRef<THREE.Mesh>(null);
-
-  useFrame(({ clock }) => {
-    if (glowRef.current) {
-      glowRef.current.scale.setScalar(1 + Math.sin(clock.elapsedTime * 2) * 0.05);
-    }
-  });
-
-  return (
-    <group position={[0, 0, 0]}>
-      {/* 太阳光晕 */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[1.8, 32, 32]} />
-        <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
-      </mesh>
-      {/* 太阳本体 */}
-      <mesh>
-        <sphereGeometry args={[1.2, 64, 64]} />
-        <meshBasicMaterial color={COLORS.sun} />
-      </mesh>
-      <pointLight intensity={3} distance={100} color={COLORS.sun} />
-      <Html position={[0, -2.5, 0]} center>
-        <div style={{ 
-          color: COLORS.sun, 
-          fontSize: '14px', 
-          fontWeight: 'bold',
-          textShadow: '0 0 10px rgba(255,217,61,0.8)',
-          whiteSpace: 'nowrap'
-        }}>
-          ☀️ 太阳
-        </div>
-      </Html>
-    </group>
-  );
-}
-
-/** 公转轨道组件 - 带方向箭头 */
-function OrbitPath() {
-  const points = useMemo(() => {
-    const pts: [number, number, number][] = [];
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2;
-      pts.push([
-        Math.cos(angle) * ORBIT_RADIUS,
-        0,
-        -Math.sin(angle) * ORBIT_RADIUS
-      ]);
-    }
-    return pts;
-  }, []);
-
-  // 公转方向箭头位置（在轨道上放置几个箭头表示逆时针方向）
-  const arrowPositions = useMemo(() => {
-    const positions: { pos: [number, number, number]; rotationZ: number }[] = [];
-    // 在4个位置放置箭头
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2 + Math.PI / 8; // 偏移一点避开季节标记
-      // 公转方向：从北极俯视是逆时针
-      // 位置: (cos(angle), 0, -sin(angle))
-      // 逆时针切线方向 = d/dθ (cos(θ), 0, -sin(θ)) = (-sin(θ), 0, -cos(θ))
-      const tangentX = -Math.sin(angle);
-      const tangentZ = -Math.cos(angle);
-      
-      // 箭头在XZ平面上，计算绕Y轴旋转角度使其指向逆时针切线方向
-      const rotationZ = Math.atan2(tangentZ, tangentX);
-      
-      positions.push({
-        pos: [
-          Math.cos(angle) * ORBIT_RADIUS,
-          0,
-          -Math.sin(angle) * ORBIT_RADIUS
-        ],
-        rotationZ: rotationZ,
-      });
-    }
-    return positions;
-  }, []);
-
-  return (
-    <group>
-      <Line
-        points={points}
-        color="#ffffff"
-        lineWidth={1}
-        dashed
-        dashSize={0.5}
-        gapSize={0.3}
-        transparent
-        opacity={0.3}
-      />
-      {/* 公转方向箭头 */}
-      {arrowPositions.map((arrow, i) => (
-        <group key={i} position={arrow.pos}>
-          <mesh rotation={[Math.PI / 2, 0, arrow.rotationZ - Math.PI / 2]}>
-            <coneGeometry args={[0.2, 0.5, 8]} />
-            <meshBasicMaterial color="#4ADE80" transparent opacity={0.7} />
-          </mesh>
-        </group>
-      ))}
-    </group>
-  );
-}
-
 /** 自转方向指示器 - 在地球旁边显示 */
 function RotationIndicator({ showLabels }: { showLabels: boolean }) {
   if (!showLabels) return null;
@@ -604,79 +379,6 @@ function RotationIndicator({ showLabels }: { showLabels: boolean }) {
     </Html>
   );
 }
-
-/** 季节位置标记 */
-function SeasonMarkers() {
-  // 坐标系：位置 = (cos(angle), 0, -sin(angle))，从北极俯视逆时针
-  // 地轴指向+X（北极星方向），决定了季节与位置的对应关系：
-  // - 冬至: angle=0 → (+X, 0, 0) 右下 → 北极背离太阳 → 直射南回归线
-  // - 春分: angle=π/2 → (0, 0, -1) 右上 → 直射赤道
-  // - 夏至: angle=π → (-X, 0, 0) 左上 → 北极朝向太阳 → 直射北回归线
-  // - 秋分: angle=3π/2 → (0, 0, +1) 左下 → 直射赤道
-  const markers = [
-    { angle: 0, label: '冬至', emoji: '❄️', color: '#3B82F6' },                    // 右下 (+X) - 北极背离太阳
-    { angle: Math.PI / 2, label: '春分', emoji: '🌸', color: '#10B981' },          // 右上 (-Z)
-    { angle: Math.PI, label: '夏至', emoji: '☀️', color: '#EF4444' },              // 左上 (-X) - 北极朝向太阳
-    { angle: (Math.PI * 3) / 2, label: '秋分', emoji: '🍂', color: '#F59E0B' },    // 左下 (+Z)
-  ];
-
-  return (
-    <group>
-      {markers.map((marker, i) => (
-        <Html 
-          key={i}
-          position={[
-            Math.cos(marker.angle) * (ORBIT_RADIUS + 1.5),
-            0.5,
-            -Math.sin(marker.angle) * (ORBIT_RADIUS + 1.5)
-          ]} 
-          center
-        >
-          <div style={{ 
-            color: marker.color, 
-            fontSize: '12px', 
-            fontWeight: 'bold',
-            whiteSpace: 'nowrap',
-            background: 'rgba(0,0,0,0.6)',
-            padding: '2px 8px',
-            borderRadius: 4,
-          }}>
-            {marker.emoji} {marker.label}
-          </div>
-        </Html>
-      ))}
-    </group>
-  );
-}
-
-/** 相机控制器 */
-interface CameraControllerHandle {
-  reset: () => void;
-}
-
-const CameraController = forwardRef<CameraControllerHandle>((_, ref) => {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-  
-  useImperativeHandle(ref, () => ({
-    reset: () => {
-      camera.position.set(12, 10, 12);
-      camera.lookAt(0, 0, 0);
-      if (controlsRef.current) {
-        controlsRef.current.reset();
-      }
-    }
-  }));
-  
-  return (
-    <OrbitControls 
-      ref={controlsRef}
-      enablePan={false}
-      minDistance={8}
-      maxDistance={35}
-    />
-  );
-});
 
 /** 场景组件 */
 interface SceneProps {
@@ -1196,19 +898,8 @@ export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
   const handleSeasonChange = (season: SeasonType) => {
     setCurrentSeason(season);
     setSunLatitude(SEASONS[season].sunLatitude);
-    // 设置对应的公转进度
-    // 坐标系：位置 = (cos(angle), 0, -sin(angle))，从北极俯视逆时针
-    // - 冬至: progress=0 → angle=0 → (+X, 0, 0) 右下 → 北极背离太阳 → 直射南回归线
-    // - 春分: progress=0.25 → angle=π/2 → (0, 0, -1) 右上 → 直射赤道
-    // - 夏至: progress=0.5 → angle=π → (-X, 0, 0) 左上 → 北极朝向太阳 → 直射北回归线
-    // - 秋分: progress=0.75 → angle=3π/2 → (0, 0, +1) 左下 → 直射赤道
-    const progressMap: Record<SeasonType, number> = {
-      winter: 0,
-      spring: 0.25,
-      summer: 0.5,
-      autumn: 0.75,
-    };
-    setOrbitProgress(progressMap[season]);
+    // 使用公共常量设置对应的公转进度
+    setOrbitProgress(SEASON_PROGRESS_MAP[season]);
     setIsYearAnimating(false); // 停止年循环动画
   };
 

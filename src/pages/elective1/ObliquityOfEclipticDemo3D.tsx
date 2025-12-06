@@ -5,10 +5,9 @@
  * 面向高中生的现代化、活泼的教学动画
  */
 
-import { useRef, useState, useMemo, Suspense, useImperativeHandle, forwardRef } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useRef, useState, Suspense } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { 
-  OrbitControls, 
   Stars, 
   Line,
   Html,
@@ -40,6 +39,20 @@ import {
   ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 
+// 导入公共组件和工具
+import {
+  OBLIQUITY,
+  ASTRONOMY_COLORS,
+} from '../../shared/constants';
+import { formatDegreeMinute } from '../../shared/utils';
+import {
+  TwoDIcon,
+  Sun,
+  OrbitPath,
+  CameraController,
+  type CameraControllerHandle,
+} from '../../shared/components';
+
 // ===================== 类型定义 =====================
 
 interface ObliquityDemo3DProps {
@@ -48,89 +61,17 @@ interface ObliquityDemo3DProps {
   maxObliquity?: number;
 }
 
-// ===================== 自定义图标 =====================
-
-/** 2D 旋转图标 - 模仿 ThreeDRotation 样式但显示 2D */
-const TwoDIcon = () => (
-  <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-    {/* 旋转箭头 - 左下 */}
-    <path d="M7.52 21.48C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
-    {/* 旋转箭头 - 右上 */}
-    <path d="M16.48 2.52C19.75 4.06 22.09 7.24 22.45 11h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32z"/>
-    {/* 2D 文字 */}
-    <text x="6" y="16" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">2D</text>
-  </svg>
-);
-
-// ===================== 常量 =====================
+// ===================== 本地常量 =====================
 
 const COLORS = {
-  sun: '#FFD93D',
-  sunGlow: '#FFF3B0',
-  earth: '#4A90D9',
-  earthGreen: '#5CB85C',
-  orbit: '#6366F1',
-  eclipticPlane: '#10B981',
-  equatorPlane: '#F59E0B',
-  axis: '#EF4444',
-  angleArc: '#A855F7',
-  space: '#0F172A',
+  ...ASTRONOMY_COLORS,
+  // 特定于此组件的颜色覆盖
+  axis: '#EF4444',  // 此演示中地轴使用红色以强调倾斜
 };
 
-/** 格式化角度为度分格式 */
-const formatDegreeMinute = (value: number) => {
-  const degrees = Math.floor(value);
-  const minutes = Math.round((value - degrees) * 60);
-  return `${degrees}°${minutes}′`;
-};
+// ===================== 本地 3D 组件（特定于此演示） =====================
 
-// ===================== 3D 组件 =====================
-
-/** 太阳组件 */
-function Sun() {
-  const sunRef = useRef<THREE.Mesh>(null);
-  const glowRef = useRef<THREE.Mesh>(null);
-
-  useFrame(({ clock }) => {
-    if (glowRef.current) {
-      glowRef.current.scale.setScalar(1 + Math.sin(clock.elapsedTime * 2) * 0.05);
-    }
-  });
-
-  return (
-    <group position={[0, 0, 0]}>
-      {/* 太阳光晕 */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[1.8, 32, 32]} />
-        <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
-      </mesh>
-      
-      {/* 太阳主体 */}
-      <mesh ref={sunRef}>
-        <sphereGeometry args={[1.2, 64, 64]} />
-        <meshBasicMaterial color={COLORS.sun} />
-      </mesh>
-
-      {/* 太阳光源 */}
-      <pointLight intensity={2} distance={100} color={COLORS.sun} />
-      
-      {/* 太阳标签 */}
-      <Html position={[0, -2, 0]} center>
-        <div style={{ 
-          color: COLORS.sun, 
-          fontSize: '14px', 
-          fontWeight: 'bold',
-          textShadow: '0 0 10px rgba(255,217,61,0.8)',
-          whiteSpace: 'nowrap'
-        }}>
-          ☀️ 太阳
-        </div>
-      </Html>
-    </group>
-  );
-}
-
-/** 地球组件 - 带真实地图纹理 */
+/** 地球组件 - 带真实地图纹理（特定于黄赤交角演示） */
 interface EarthProps {
   position: [number, number, number];
   obliquity: number;
@@ -308,62 +249,6 @@ function Earth({ position, obliquity, showLabels }: EarthProps) {
   );
 }
 
-/** 轨道组件 */
-function Orbit({ radius }: { radius: number }) {
-  const points = useMemo(() => {
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2;
-      pts.push(new THREE.Vector3(
-        Math.cos(angle) * radius,
-        0,
-        Math.sin(angle) * radius
-      ));
-    }
-    return pts;
-  }, [radius]);
-
-  return (
-    <Line
-      points={points}
-      color={COLORS.orbit}
-      lineWidth={1}
-      dashed
-      dashSize={0.5}
-      gapSize={0.3}
-    />
-  );
-}
-
-/** 相机控制器 - 用于重置视角 */
-interface CameraControllerHandle {
-  reset: () => void;
-}
-
-const CameraController = forwardRef<CameraControllerHandle>((_, ref) => {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-  
-  useImperativeHandle(ref, () => ({
-    reset: () => {
-      camera.position.set(15, 10, 15);
-      camera.lookAt(0, 0, 0);
-      if (controlsRef.current) {
-        controlsRef.current.reset();
-      }
-    }
-  }));
-  
-  return (
-    <OrbitControls 
-      ref={controlsRef}
-      enablePan={false}
-      minDistance={5}
-      maxDistance={30}
-    />
-  );
-});
-
 /** 场景组件 */
 interface SceneProps {
   obliquity: number;
@@ -400,8 +285,8 @@ function Scene({ obliquity, isPlaying, showLabels, cameraRef }: SceneProps) {
       {/* 太阳 */}
       <Sun />
       
-      {/* 轨道 */}
-      <Orbit radius={orbitRadius} />
+      {/* 轨道 - 使用公共组件 */}
+      <OrbitPath radius={orbitRadius} />
       
       {/* 黄道面可视化（半透明圆盘） */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
@@ -417,8 +302,8 @@ function Scene({ obliquity, isPlaying, showLabels, cameraRef }: SceneProps) {
       {/* 地球 */}
       <Earth position={earthPosition} obliquity={obliquity} showLabels={showLabels} />
       
-      {/* 相机控制 */}
-      <CameraController ref={cameraRef} />
+      {/* 相机控制 - 使用公共组件 */}
+      <CameraController ref={cameraRef} defaultPosition={[15, 10, 15]} />
     </>
   );
 }
@@ -922,7 +807,7 @@ function MobileControlPanel({
 // ===================== 主组件 =====================
 
 export default function ObliquityOfEclipticDemo3D({
-  initialObliquity = 23 + 26/60,  // 23°26′
+  initialObliquity = OBLIQUITY,  // 使用公共常量 23°26′
   minObliquity = 0,
   maxObliquity = 30,
 }: ObliquityDemo3DProps) {

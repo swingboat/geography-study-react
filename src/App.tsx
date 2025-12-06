@@ -1,9 +1,8 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Container, 
   Typography, 
-  Box, 
   Card, 
   CardContent, 
   CardActionArea,
@@ -12,7 +11,6 @@ import {
 } from '@mui/material';
 import {
   Home as HomeIcon,
-  Public as GlobeIcon,
   NavigateNext as NavigateNextIcon
 } from '@mui/icons-material';
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
@@ -36,11 +34,12 @@ const itemVariants = {
 // 首页组件
 function HomePage() {
   return (
-    <Box 
-      sx={{ 
+    <div 
+      style={{ 
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        py: 6,
+        paddingTop: 48,
+        paddingBottom: 48,
       }}
     >
       <Container maxWidth="lg">
@@ -49,7 +48,7 @@ function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <Box sx={{ mb: 6, textAlign: 'center' }}>
+          <div style={{ marginBottom: 48, textAlign: 'center' }}>
             <Typography 
               variant="h2" 
               component="h1" 
@@ -72,7 +71,7 @@ function HomePage() {
             >
               交互式 3D 学习，让地理更生动 ✨
             </Typography>
-          </Box>
+          </div>
         </motion.div>
 
         {/* 选修一：自然地理基础 */}
@@ -81,7 +80,7 @@ function HomePage() {
           initial="hidden"
           animate="visible"
         >
-          <Box sx={{ mb: 4 }}>
+          <div style={{ marginBottom: 32 }}>
             <motion.div variants={itemVariants}>
               <Typography 
                 variant="h5" 
@@ -97,7 +96,7 @@ function HomePage() {
               </Typography>
             </motion.div>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 3 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
               {/* 黄赤交角 */}
               <motion.div variants={itemVariants}>
                 <Card 
@@ -115,7 +114,7 @@ function HomePage() {
                 >
                   <CardActionArea component={Link} to="/elective1/obliquity" sx={{ height: '100%', p: 1 }}>
                     <CardContent>
-                      <Box sx={{ fontSize: '3rem', mb: 2 }}>🌍</Box>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌍</div>
                       <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                         黄赤交角
                       </Typography>
@@ -147,7 +146,7 @@ function HomePage() {
                   }}
                 >
                   <CardContent>
-                    <Box sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }}>🌞</Box>
+                    <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.5 }}>🌞</div>
                     <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                       四季变化
                     </Typography>
@@ -170,7 +169,7 @@ function HomePage() {
                   }}
                 >
                   <CardContent>
-                    <Box sx={{ fontSize: '3rem', mb: 2, opacity: 0.5 }}>📍</Box>
+                    <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.5 }}>📍</div>
                     <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
                       太阳直射点移动
                     </Typography>
@@ -181,18 +180,18 @@ function HomePage() {
                   </CardContent>
                 </Card>
               </motion.div>
-            </Box>
-          </Box>
+            </div>
+          </div>
         </motion.div>
       </Container>
-    </Box>
+    </div>
   );
 }
 
 // 黄赤交角页面
 function ObliquityPage() {
   return (
-    <Box sx={{ minHeight: '100vh', background: '#F8FAFC', py: 4 }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: 32, paddingBottom: 32 }}>
       <Container maxWidth="xl">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -220,7 +219,7 @@ function ObliquityPage() {
         
         <ObliquityOfEclipticDemo3D />
       </Container>
-    </Box>
+    </div>
   );
 }
 

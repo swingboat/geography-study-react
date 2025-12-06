@@ -36,6 +36,8 @@ import {
   ChevronLeft as CollapseIcon,
   ChevronRight as ExpandIcon,
   ThreeDRotation as ThreeDIcon,
+  ScreenRotation as ScreenRotationIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 
 // ===================== 类型定义 =====================
@@ -539,6 +541,378 @@ function TwoDView({ obliquity }: { obliquity: number }) {
   );
 }
 
+// ===================== 横屏提示组件 =====================
+
+/** 横屏提示遮罩 */
+function LandscapePrompt({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      {/* 旋转动画图标 */}
+      <motion.div
+        animate={{ rotate: [0, 90, 90, 0] }}
+        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        style={{ marginBottom: 24 }}
+      >
+        <ScreenRotationIcon sx={{ fontSize: 80, color: '#A855F7' }} />
+      </motion.div>
+      
+      {/* 手机图标动画 */}
+      <motion.div
+        animate={{ rotate: [0, 0, 90, 90, 0] }}
+        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        style={{
+          width: 60,
+          height: 100,
+          border: '4px solid #6366F1',
+          borderRadius: 12,
+          marginBottom: 32,
+          position: 'relative',
+        }}
+      >
+        {/* 屏幕 */}
+        <div style={{
+          position: 'absolute',
+          top: 8,
+          left: 4,
+          right: 4,
+          bottom: 20,
+          background: 'rgba(99, 102, 241, 0.3)',
+          borderRadius: 4,
+        }} />
+        {/* Home键 */}
+        <div style={{
+          position: 'absolute',
+          bottom: 6,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 20,
+          height: 6,
+          background: '#6366F1',
+          borderRadius: 3,
+        }} />
+      </motion.div>
+
+      <Typography
+        variant="h5"
+        sx={{
+          color: 'white',
+          fontWeight: 700,
+          textAlign: 'center',
+          mb: 2,
+        }}
+      >
+        📱 请旋转手机
+      </Typography>
+      
+      <Typography
+        variant="body1"
+        sx={{
+          color: 'rgba(255,255,255,0.7)',
+          textAlign: 'center',
+          mb: 4,
+          maxWidth: 280,
+          lineHeight: 1.8,
+        }}
+      >
+        横屏模式下可以获得更好的 3D 交互体验，完整查看黄赤交角演示
+      </Typography>
+
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={onDismiss}
+        style={{
+          background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+          border: 'none',
+          borderRadius: 12,
+          padding: '12px 32px',
+          color: 'white',
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: 'pointer',
+          boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
+        }}
+      >
+        继续使用竖屏
+      </motion.button>
+
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'rgba(255,255,255,0.4)',
+          mt: 3,
+          textAlign: 'center',
+        }}
+      >
+        横屏后此提示将自动消失
+      </Typography>
+    </motion.div>
+  );
+}
+
+// ===================== 移动端底部控制面板 =====================
+
+interface MobileControlPanelProps {
+  obliquity: number;
+  setObliquity: (value: number) => void;
+  minObliquity: number;
+  maxObliquity: number;
+  initialObliquity: number;
+  showInfo: boolean;
+  setShowInfo: (value: boolean) => void;
+}
+
+function MobileControlPanel({
+  obliquity,
+  setObliquity,
+  minObliquity,
+  maxObliquity,
+  initialObliquity,
+  showInfo,
+  setShowInfo,
+}: MobileControlPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+      }}
+    >
+      {/* 展开/收起按钮 */}
+      <div
+        onClick={() => setIsExpanded(!isExpanded)}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px 0',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 30%)',
+          cursor: 'pointer',
+        }}
+      >
+        <motion.div
+          animate={{ rotate: isExpanded ? 180 : 0 }}
+          style={{
+            background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+            borderRadius: 20,
+            padding: '4px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: '0 2px 10px rgba(99, 102, 241, 0.3)',
+          }}
+        >
+          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+            {isExpanded ? '收起' : '控制面板'}
+          </Typography>
+          <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
+        </motion.div>
+      </div>
+
+      {/* 面板内容 */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+              {/* 标题 */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
+              }}>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  🌍 黄赤交角
+                </Typography>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 700,
+                    background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                    backgroundClip: 'text',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  {formatDegreeMinute(obliquity)}
+                </Typography>
+              </div>
+
+              {/* 滑块 */}
+              <div style={{
+                background: 'rgba(99, 102, 241, 0.08)',
+                borderRadius: 12,
+                padding: 16,
+                marginBottom: 12,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Typography variant="caption" color="text.secondary">{minObliquity}°</Typography>
+                  <Slider
+                    value={obliquity}
+                    onChange={(_, v) => setObliquity(v as number)}
+                    min={minObliquity}
+                    max={maxObliquity}
+                    step={0.1}
+                    sx={{
+                      flex: 1,
+                      '& .MuiSlider-thumb': {
+                        background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+                        width: 24,
+                        height: 24,
+                      },
+                      '& .MuiSlider-track': {
+                        background: 'linear-gradient(90deg, #6366F1 0%, #A855F7 100%)',
+                        height: 6,
+                      },
+                      '& .MuiSlider-rail': {
+                        height: 6,
+                      },
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">{maxObliquity}°</Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => setObliquity(initialObliquity)}
+                    sx={{ color: '#6366F1' }}
+                  >
+                    <ResetIcon fontSize="small" />
+                  </IconButton>
+                </div>
+                
+                {Math.abs(obliquity - initialObliquity) < 0.5 && (
+                  <Chip
+                    label="✨ 接近真实值！(约23°26′)"
+                    size="small"
+                    sx={{
+                      mt: 1,
+                      background: 'linear-gradient(135deg, #10B981 0%, #34D399 100%)',
+                      color: 'white',
+                      fontWeight: 500,
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* 图例 */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 6,
+                marginBottom: 12,
+              }}>
+                {[
+                  { color: COLORS.eclipticPlane, label: '黄道面' },
+                  { color: COLORS.equatorPlane, label: '赤道面' },
+                  { color: COLORS.axis, label: '地轴' },
+                  { color: COLORS.angleArc, label: '黄赤交角' },
+                ].map(item => (
+                  <Chip
+                    key={item.label}
+                    label={item.label}
+                    size="small"
+                    sx={{
+                      background: `${item.color}20`,
+                      border: `1px solid ${item.color}40`,
+                      color: item.color,
+                      fontWeight: 500,
+                      fontSize: '11px',
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* 知识点（可展开） */}
+              <div
+                onClick={() => setShowInfo(!showInfo)}
+                style={{
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  borderRadius: 12,
+                  padding: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
+                    💡 知识点
+                  </Typography>
+                  <motion.div animate={{ rotate: showInfo ? 180 : 0 }}>
+                    <ExpandMoreIcon sx={{ color: '#F59E0B', fontSize: 20 }} />
+                  </motion.div>
+                </div>
+                
+                <AnimatePresence>
+                  {showInfo && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                    >
+                      <div style={{ paddingTop: 8, fontSize: 13, lineHeight: 1.8 }}>
+                        <p style={{ margin: '0 0 4px' }}>
+                          <strong style={{ color: COLORS.eclipticPlane }}>黄道面</strong>：地球绕太阳公转的轨道平面
+                        </p>
+                        <p style={{ margin: '0 0 4px' }}>
+                          <strong style={{ color: COLORS.equatorPlane }}>赤道面</strong>：与地轴垂直，过地心的平面
+                        </p>
+                        <p style={{ margin: 0 }}>
+                          <strong style={{ color: COLORS.angleArc }}>黄赤交角</strong>：约 23°26′，决定了四季变化
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 // ===================== 主组件 =====================
 
 export default function ObliquityOfEclipticDemo3D({
@@ -548,6 +922,11 @@ export default function ObliquityOfEclipticDemo3D({
 }: ObliquityDemo3DProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isPortrait = useMediaQuery('(orientation: portrait)');
+  const isSmallScreen = useMediaQuery('(max-width: 600px)');
+  
+  // 是否显示横屏提示（仅在竖屏的小屏设备上显示）
+  const shouldShowLandscapePrompt = isSmallScreen && isPortrait;
   
   const [obliquity, setObliquity] = useState(initialObliquity);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -555,6 +934,7 @@ export default function ObliquityOfEclipticDemo3D({
   const [showInfo, setShowInfo] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true); // 右侧面板是否展开
   const [is3D, setIs3D] = useState(true); // 3D/2D视图切换
+  const [dismissedLandscapePrompt, setDismissedLandscapePrompt] = useState(false); // 用户是否已关闭横屏提示
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
   
   const panelWidth = isPanelOpen ? 320 : 0;
@@ -562,18 +942,20 @@ export default function ObliquityOfEclipticDemo3D({
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: isMobile ? 'column' : 'row',
-    height: isMobile ? 'auto' : 'calc(100vh - 120px)',
-    minHeight: isMobile ? '400px' : '500px',
-    maxHeight: isMobile ? 'none' : 'calc(100vh - 120px)',
+    height: isMobile ? '100vh' : 'calc(100vh - 120px)',
+    minHeight: isMobile ? '100vh' : '500px',
+    maxHeight: isMobile ? '100vh' : 'calc(100vh - 120px)',
     position: 'relative',
+    overflow: 'hidden',
   };
 
   const sceneContainerStyle: React.CSSProperties = {
     flex: 1,
-    height: '100%',
-    minHeight: isMobile ? '400px' : 'auto',
+    height: isMobile ? '100%' : '100%',
+    minHeight: isMobile ? '100%' : 'auto',
     marginRight: isMobile ? 0 : `${panelWidth + 40}px`,
     transition: 'margin-right 0.3s ease',
+    paddingBottom: isMobile ? 60 : 0, // 给底部控制面板留空间
   };
 
   const controlButtonsStyle: React.CSSProperties = {
@@ -590,12 +972,20 @@ export default function ObliquityOfEclipticDemo3D({
   };
 
   return (
-    <div style={containerStyle}>
-      {/* 左侧：3D 场景 */}
-      <div
-        key={`scene-container-${isPanelOpen}`}
-        style={sceneContainerStyle}
-      >
+    <>
+      {/* 横屏提示 - 仅在竖屏小屏设备且用户未关闭时显示 */}
+      <AnimatePresence>
+        {shouldShowLandscapePrompt && !dismissedLandscapePrompt && (
+          <LandscapePrompt onDismiss={() => setDismissedLandscapePrompt(true)} />
+        )}
+      </AnimatePresence>
+
+      <div style={containerStyle}>
+        {/* 左侧：3D 场景 */}
+        <div
+          key={`scene-container-${isPanelOpen}`}
+          style={sceneContainerStyle}
+        >
         <Card
           component={motion.div}
           initial={{ opacity: 0, scale: 0.9 }}
@@ -702,7 +1092,7 @@ export default function ObliquityOfEclipticDemo3D({
               fontSize: '12px',
             }}
           >
-            🖱️ 拖拽旋转 | 滚轮缩放
+            {isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
           </Typography>
         </Card>
       </div>
@@ -744,7 +1134,8 @@ export default function ObliquityOfEclipticDemo3D({
         </div>
       )}
 
-      {/* 右侧：控制面板 */}
+      {/* 右侧：控制面板 - 仅在非移动端显示 */}
+      {!isMobile && (
       <div
         style={{ 
           position: 'absolute',
@@ -1013,6 +1404,21 @@ export default function ObliquityOfEclipticDemo3D({
           </CardContent>
         </Card>
       </div>
+      )}
+
+      {/* 移动端底部控制面板 */}
+      {isMobile && (
+        <MobileControlPanel
+          obliquity={obliquity}
+          setObliquity={setObliquity}
+          minObliquity={minObliquity}
+          maxObliquity={maxObliquity}
+          initialObliquity={initialObliquity}
+          showInfo={showInfo}
+          setShowInfo={setShowInfo}
+        />
+      )}
     </div>
+    </>
   );
 }

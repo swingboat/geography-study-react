@@ -19,6 +19,7 @@ import {
 } from '@mui/icons-material';
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
 import TropicsDemo3D from './pages/elective1/TropicsDemo3D';
+import LongitudeDemo3D from './pages/elective1/LongitudeDemo3D';
 
 // 动画变体
 const containerVariants = {
@@ -168,6 +169,44 @@ function HomePage() {
                         label="✨ 3D 互动" 
                         sx={{ 
                           background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                          color: 'white',
+                          fontWeight: 600
+                        }} 
+                        size="small" 
+                      />
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </motion.div>
+
+              {/* 经度 */}
+              <motion.div variants={itemVariants}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    background: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }
+                  }}
+                >
+                  <CardActionArea component={Link} to="/elective1/longitude" sx={{ height: '100%', p: 1 }}>
+                    <CardContent>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌍</div>
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                        经度
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        理解经度的定义，认识本初子午线与东西半球的划分
+                      </Typography>
+                      <Chip 
+                        label="✨ 3D 互动" 
+                        sx={{ 
+                          background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                           color: 'white',
                           fontWeight: 600
                         }} 
@@ -344,6 +383,74 @@ function TropicsPage() {
   );
 }
 
+// 经度页面
+function LongitudePage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+      {/* 移动端固定返回按钮 */}
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+          }}
+        >
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+              },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        </div>
+      )}
+
+      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#10B981' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>经度</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
+        
+        <LongitudeDemo3D />
+      </Container>
+    </div>
+  );
+}
+
 // 主应用组件
 function App() {
   return (
@@ -352,6 +459,7 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/elective1/obliquity" element={<ObliquityPage />} />
         <Route path="/elective1/tropics" element={<TropicsPage />} />
+        <Route path="/elective1/longitude" element={<LongitudePage />} />
       </Routes>
     </BrowserRouter>
   );

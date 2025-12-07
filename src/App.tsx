@@ -390,7 +390,7 @@ function LongitudePage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
       {/* 移动端固定返回按钮 */}
       {isMobile && (
         <div
@@ -417,7 +417,7 @@ function LongitudePage() {
         </div>
       )}
 
-      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+      <Container maxWidth={false} sx={{ px: isMobile ? 0 : 3, maxWidth: '100%' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -427,7 +427,7 @@ function LongitudePage() {
           >
             <Breadcrumbs 
               separator={<NavigateNextIcon fontSize="small" />} 
-              sx={{ mb: 3 }}
+              sx={{ mb: 2 }}
             >
               <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#10B981' }}>
                 <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />

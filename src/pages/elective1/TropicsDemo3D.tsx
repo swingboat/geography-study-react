@@ -16,16 +16,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import * as THREE from 'three';
 import {
-  Card,
   CardContent,
   Typography,
   Slider,
   Chip,
-  useTheme,
-  useMediaQuery,
   IconButton,
   Tooltip,
-  LinearProgress,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
@@ -34,10 +30,6 @@ import {
   Pause as PauseIcon,
   RestartAlt as ResetIcon,
   Info as InfoIcon,
-  ChevronLeft as CollapseIcon,
-  ChevronRight as ExpandIcon,
-  ThreeDRotation as ThreeDIcon,
-  ScreenRotation as ScreenRotationIcon,
   ExpandMore as ExpandMoreIcon,
   Label as LabelIcon,
   LabelOff as LabelOffIcon,
@@ -55,12 +47,13 @@ import {
 } from '../../shared/constants';
 import { formatDegreeMinute } from '../../shared/utils';
 import {
-  TwoDIcon,
   Sun,
   OrbitPath,
   SeasonMarkers,
   LatitudeLine,
   CameraController,
+  AnimationPageLayout,
+  SceneLoading,
   type CameraControllerHandle,
 } from '../../shared/components';
 
@@ -525,374 +518,18 @@ function TwoDView({ sunLatitude }: { sunLatitude: number }) {
   );
 }
 
-// ===================== 横屏提示组件 =====================
-
-function LandscapePrompt({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-        zIndex: 9999,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 24,
-      }}
-    >
-      <motion.div
-        animate={{ rotate: [0, 90, 90, 0] }}
-        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-        style={{ marginBottom: 24 }}
-      >
-        <ScreenRotationIcon sx={{ fontSize: 80, color: '#EF4444' }} />
-      </motion.div>
-      
-      <motion.div
-        animate={{ rotate: [0, 0, 90, 90, 0] }}
-        transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-        style={{
-          width: 60,
-          height: 100,
-          border: '4px solid #EF4444',
-          borderRadius: 12,
-          marginBottom: 32,
-          position: 'relative',
-        }}
-      >
-        <div style={{
-          position: 'absolute',
-          top: 8,
-          left: 4,
-          right: 4,
-          bottom: 20,
-          background: 'rgba(239, 68, 68, 0.3)',
-          borderRadius: 4,
-        }} />
-        <div style={{
-          position: 'absolute',
-          bottom: 6,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 20,
-          height: 6,
-          background: '#EF4444',
-          borderRadius: 3,
-        }} />
-      </motion.div>
-
-      <Typography variant="h5" sx={{ color: 'white', fontWeight: 700, textAlign: 'center', mb: 2 }}>
-        📱 请旋转手机
-      </Typography>
-      
-      <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center', mb: 4, maxWidth: 280, lineHeight: 1.8 }}>
-        横屏模式下可以获得更好的 3D 交互体验，完整查看南北回归线演示
-      </Typography>
-
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={onDismiss}
-        style={{
-          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-          border: 'none',
-          borderRadius: 12,
-          padding: '12px 32px',
-          color: 'white',
-          fontSize: 16,
-          fontWeight: 600,
-          cursor: 'pointer',
-          boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)',
-        }}
-      >
-        继续使用竖屏
-      </motion.button>
-
-      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mt: 3, textAlign: 'center' }}>
-        横屏后此提示将自动消失
-      </Typography>
-    </motion.div>
-  );
-}
-
-// ===================== 移动端底部控制面板 =====================
-
-interface MobileControlPanelProps {
-  currentSeason: SeasonType;
-  setCurrentSeason: (season: SeasonType) => void;
-  sunLatitude: number;
-  setSunLatitude: (lat: number) => void;
-  showInfo: boolean;
-  setShowInfo: (value: boolean) => void;
-}
-
-function MobileControlPanel({
-  currentSeason,
-  setCurrentSeason,
-  sunLatitude,
-  setSunLatitude,
-  showInfo,
-  setShowInfo,
-}: MobileControlPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '8px 0',
-          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 30%)',
-          cursor: 'pointer',
-        }}
-      >
-        <div style={{
-          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-          borderRadius: 20,
-          padding: '4px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
-        }}>
-          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
-            {isExpanded ? '收起' : '控制面板'}
-          </Typography>
-          <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} style={{ display: 'flex', alignItems: 'center' }}>
-            <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
-          </motion.div>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            style={{
-              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              overflow: 'hidden',
-              boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
-            }}
-          >
-            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
-              {/* 标题 */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Typography variant="h6" sx={{
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}>
-                  🌍 南北回归线
-                </Typography>
-                <Typography variant="h6" sx={{
-                  fontWeight: 700,
-                  background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                }}>
-                  {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name}
-                </Typography>
-              </div>
-
-              {/* 季节选择 */}
-              <div style={{ background: 'rgba(239, 68, 68, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>选择节气</Typography>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {(Object.keys(SEASONS) as SeasonType[]).map(season => (
-                    <Chip
-                      key={season}
-                      label={`${SEASONS[season].emoji} ${SEASONS[season].name}`}
-                      onClick={() => {
-                        setCurrentSeason(season);
-                        setSunLatitude(SEASONS[season].sunLatitude);
-                      }}
-                      sx={{
-                        background: currentSeason === season 
-                          ? 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)' 
-                          : 'rgba(239, 68, 68, 0.1)',
-                        color: currentSeason === season ? 'white' : '#EF4444',
-                        fontWeight: 600,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* 直射点滑块 */}
-              <div style={{ background: 'rgba(251, 191, 36, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                <Typography variant="caption" color="text.secondary">太阳直射点纬度</Typography>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Typography variant="caption">23°S</Typography>
-                  <Slider
-                    value={sunLatitude}
-                    onChange={(_, v) => {
-                      const lat = v as number;
-                      setSunLatitude(lat);
-                      // 根据纬度同步更新季节
-                      if (lat > OBLIQUITY * 0.9) {
-                        setCurrentSeason('summer');
-                      } else if (lat < -OBLIQUITY * 0.9) {
-                        setCurrentSeason('winter');
-                      } else if (lat > 0) {
-                        setCurrentSeason('spring');
-                      } else {
-                        setCurrentSeason('autumn');
-                      }
-                    }}
-                    min={-OBLIQUITY}
-                    max={OBLIQUITY}
-                    step={0.5}
-                    sx={{
-                      flex: 1,
-                      '& .MuiSlider-thumb': { background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)' },
-                      '& .MuiSlider-track': { background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)' },
-                    }}
-                  />
-                  <Typography variant="caption">23°N</Typography>
-                </div>
-                <Typography variant="body2" sx={{ textAlign: 'center', mt: 1, fontWeight: 700, color: '#FBBF24' }}>
-                  {formatDegreeMinute(sunLatitude)}
-                </Typography>
-              </div>
-
-              {/* 图例 */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {[
-                  { color: COLORS.tropicOfCancer, label: '北回归线' },
-                  { color: COLORS.tropicOfCapricorn, label: '南回归线' },
-                  { color: COLORS.equator, label: '赤道' },
-                ].map(item => (
-                  <Chip
-                    key={item.label}
-                    label={item.label}
-                    size="small"
-                    sx={{
-                      background: `${item.color}20`,
-                      border: `1px solid ${item.color}40`,
-                      color: item.color,
-                      fontWeight: 500,
-                      fontSize: '11px',
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* 知识点 */}
-              <div
-                onClick={() => setShowInfo(!showInfo)}
-                style={{ background: 'rgba(245, 158, 11, 0.08)', borderRadius: 12, padding: 12, cursor: 'pointer' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>💡 知识点</Typography>
-                  <motion.div animate={{ rotate: showInfo ? 180 : 0 }}>
-                    <ExpandMoreIcon sx={{ color: '#F59E0B', fontSize: 20 }} />
-                  </motion.div>
-                </div>
-                
-                <AnimatePresence>
-                  {showInfo && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                    >
-                      <div style={{ paddingTop: 8, fontSize: 13, lineHeight: 1.8 }}>
-                        <p style={{ margin: '0 0 4px' }}>
-                          <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射
-                        </p>
-                        <p style={{ margin: '0 0 4px' }}>
-                          <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射
-                        </p>
-                        <p style={{ margin: 0 }}>
-                          <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可直射区域
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 // ===================== 主组件 =====================
 
 export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isPortrait = useMediaQuery('(orientation: portrait)');
-  const isSmallScreen = useMediaQuery('(max-width: 600px)');
-  
-  const shouldShowLandscapePrompt = isSmallScreen && isPortrait;
-  
   const [currentSeason, setCurrentSeason] = useState<SeasonType>('winter');
   const [sunLatitude, setSunLatitude] = useState(SEASONS.winter.sunLatitude);
   const [orbitProgress, setOrbitProgress] = useState(0); // 0-1，表示公转进度，0=冬至
   const [autoRotate, setAutoRotate] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const [is3D, setIs3D] = useState(true);
-  const [dismissedLandscapePrompt, setDismissedLandscapePrompt] = useState(false);
   const [isYearAnimating, setIsYearAnimating] = useState(false);
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
   const animationRef = useRef<number | null>(null);
-  
-  const panelWidth = isPanelOpen ? 320 : 0;
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: isMobile ? 'column' : 'row',
-    height: isMobile ? '100vh' : 'calc(100vh - 120px)',
-    minHeight: isMobile ? '100vh' : '500px',
-    maxHeight: isMobile ? '100vh' : 'calc(100vh - 120px)',
-    position: 'relative',
-    overflow: 'hidden',
-  };
-
-  const sceneContainerStyle: React.CSSProperties = {
-    flex: 1,
-    height: isMobile ? '100%' : '100%',
-    minHeight: isMobile ? '100%' : 'auto',
-    marginRight: isMobile ? 0 : `${panelWidth + 40}px`,
-    transition: 'margin-right 0.3s ease',
-    paddingBottom: isMobile ? 60 : 0,
-  };
-
-  const controlButtonsStyle: React.CSSProperties = {
-    position: 'absolute',
-    bottom: 16,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    display: 'flex',
-    gap: 8,
-    background: 'rgba(255,255,255,0.1)',
-    backdropFilter: 'blur(10px)',
-    borderRadius: 12,
-    padding: 8,
-  };
 
   // 当季节变化时更新直射点纬度和公转进度
   const handleSeasonChange = (season: SeasonType) => {
@@ -958,435 +595,477 @@ export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
     setIsYearAnimating(prev => !prev);
   }, []);
 
-  return (
+  // 处理滑块变化
+  const handleSunLatitudeChange = (_: unknown, v: number | number[]) => {
+    const lat = v as number;
+    setSunLatitude(lat);
+    // 根据纬度同步更新季节和公转位置
+    const normalizedLat = Math.max(-1, Math.min(1, -lat / OBLIQUITY));
+    const angle = Math.acos(normalizedLat); // 0 到 π
+    const progress = angle / (2 * Math.PI);
+    setOrbitProgress(progress);
+    // 更新季节
+    if (lat > OBLIQUITY * 0.9) {
+      setCurrentSeason('summer');
+    } else if (lat < -OBLIQUITY * 0.9) {
+      setCurrentSeason('winter');
+    } else if (Math.abs(lat) < OBLIQUITY * 0.1) {
+      setCurrentSeason('spring');
+    } else if (lat > 0) {
+      setCurrentSeason('spring');
+    } else {
+      setCurrentSeason('autumn');
+    }
+    setIsYearAnimating(false);
+  };
+
+  // 3D 场景
+  const scene3D = (
+    <Suspense fallback={<SceneLoading />}>
+      <Canvas camera={{ position: [15, 12, 15], fov: 50 }} style={{ width: '100%', height: '100%' }}>
+        <Scene 
+          sunLatitude={sunLatitude} 
+          orbitProgress={orbitProgress}
+          showLabels={showLabels} 
+          autoRotate={autoRotate} 
+          isYearAnimating={isYearAnimating}
+          cameraRef={cameraControllerRef} 
+        />
+      </Canvas>
+    </Suspense>
+  );
+
+  // 2D 视图
+  const scene2D = (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <TwoDView sunLatitude={sunLatitude} />
+    </div>
+  );
+
+  // 底部控制按钮
+  const bottomControls = (is3D: boolean) => (
     <>
-      <AnimatePresence>
-        {shouldShowLandscapePrompt && !dismissedLandscapePrompt && (
-          <LandscapePrompt onDismiss={() => setDismissedLandscapePrompt(true)} />
-        )}
-      </AnimatePresence>
+      {/* 年循环动画按钮 */}
+      <Tooltip title={isYearAnimating ? '⏸️ 暂停公转动画' : '▶️ 播放公转动画（观察直射点移动）'}>
+        <IconButton
+          onClick={toggleYearAnimation}
+          sx={{ 
+            color: isYearAnimating ? '#FBBF24' : 'white', 
+            '&:hover': { background: 'rgba(255,255,255,0.2)' },
+            animation: isYearAnimating ? 'pulse 1s infinite' : 'none',
+          }}
+        >
+          <AnimationIcon />
+        </IconButton>
+      </Tooltip>
+      {is3D && (
+        <>
+          <Tooltip title={autoRotate ? '暂停地球自转' : '开启地球自转'}>
+            <IconButton
+              onClick={() => setAutoRotate(!autoRotate)}
+              sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+            >
+              {autoRotate ? <PauseIcon /> : <PlayIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={showLabels ? '隐藏地球上的标签' : '显示地球上的标签'}>
+            <IconButton
+              onClick={() => setShowLabels(!showLabels)}
+              sx={{ color: showLabels ? '#4ADE80' : 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+            >
+              {showLabels ? <LabelIcon /> : <LabelOffIcon />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="重置视角">
+            <IconButton
+              onClick={() => cameraControllerRef.current?.reset()}
+              sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+            >
+              <ResetIcon />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+    </>
+  );
 
-      <div style={containerStyle}>
-        <div key={`scene-container-${isPanelOpen}`} style={sceneContainerStyle}>
-          <Card
-            component={motion.div}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
+  // 控制面板
+  const controlPanel = (
+    <CardContent sx={{ p: 2 }}>
+      {/* 标题 */}
+      <div style={{ 
+        marginBottom: 20,
+        padding: 16,
+        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
+        borderRadius: 12,
+        border: '1px solid rgba(239, 68, 68, 0.2)',
+      }}>
+        <Typography variant="h5" sx={{
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          mb: 0.5,
+        }}>
+          🌍 南北回归线
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Tropic of Cancer & Capricorn
+        </Typography>
+      </div>
+
+      {/* 季节选择 */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        border: '1px solid rgba(239, 68, 68, 0.2)',
+      }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#EF4444' }}>
+          🗓️ 选择节气
+        </Typography>
+        
+        <ToggleButtonGroup
+          value={currentSeason}
+          exclusive
+          onChange={(_, value) => value && handleSeasonChange(value)}
+          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}
+        >
+          {(Object.keys(SEASONS) as SeasonType[]).map(season => (
+            <ToggleButton 
+              key={season} 
+              value={season}
+              sx={{
+                flex: '1 1 45%',
+                borderRadius: '8px !important',
+                border: '1px solid rgba(239, 68, 68, 0.3) !important',
+                '&.Mui-selected': {
+                  background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+                  color: 'white',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #DC2626 0%, #EA580C 100%)',
+                  },
+                },
+              }}
+            >
+              {SEASONS[season].emoji} {SEASONS[season].name}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+
+        <div style={{ marginTop: 12, padding: 12, background: 'rgba(255,255,255,0.5)', borderRadius: 8 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: '#EF4444' }}>
+            {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name} · {SEASONS[currentSeason].date}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {SEASONS[currentSeason].description}
+          </Typography>
+        </div>
+      </div>
+
+      {/* 直射点控制 */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        border: '1px solid rgba(251, 191, 36, 0.2)',
+      }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#FBBF24' }}>
+          ☀️ 太阳直射点纬度
+        </Typography>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Typography variant="caption" color="text.secondary">23°S</Typography>
+          <Slider
+            value={sunLatitude}
+            onChange={handleSunLatitudeChange}
+            min={-OBLIQUITY}
+            max={OBLIQUITY}
+            step={0.5}
+            marks={[
+              { value: -OBLIQUITY, label: '' },
+              { value: 0, label: '' },
+              { value: OBLIQUITY, label: '' },
+            ]}
             sx={{
-              height: '100%',
-              background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-              borderRadius: 4,
-              overflow: 'hidden',
-              position: 'relative',
+              flex: 1,
+              '& .MuiSlider-thumb': {
+                background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+                boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
+              },
+              '& .MuiSlider-track': {
+                background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)',
+              },
             }}
-          >
-            {is3D ? (
-              <Suspense fallback={
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
-                  <Typography color="white">🚀 加载 3D 场景中...</Typography>
-                  <LinearProgress sx={{ width: '50%' }} />
-                </div>
-              }>
-                <Canvas camera={{ position: [15, 12, 15], fov: 50 }} style={{ width: '100%', height: '100%' }}>
-                  <Scene 
-                    sunLatitude={sunLatitude} 
-                    orbitProgress={orbitProgress}
-                    showLabels={showLabels} 
-                    autoRotate={autoRotate} 
-                    isYearAnimating={isYearAnimating}
-                    cameraRef={cameraControllerRef} 
-                  />
-                </Canvas>
-              </Suspense>
-            ) : (
-              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                <TwoDView sunLatitude={sunLatitude} />
-              </div>
-            )}
-
-            <div style={controlButtonsStyle}>
-              {/* 年循环动画按钮 */}
-              <Tooltip title={isYearAnimating ? '⏸️ 暂停公转动画' : '▶️ 播放公转动画（观察直射点移动）'}>
-                <IconButton
-                  onClick={toggleYearAnimation}
-                  sx={{ 
-                    color: isYearAnimating ? '#FBBF24' : 'white', 
-                    '&:hover': { background: 'rgba(255,255,255,0.2)' },
-                    animation: isYearAnimating ? 'pulse 1s infinite' : 'none',
-                  }}
-                >
-                  <AnimationIcon />
-                </IconButton>
-              </Tooltip>
-              {is3D && (
-                <>
-                  <Tooltip title={autoRotate ? '暂停地球自转' : '开启地球自转'}>
-                    <IconButton
-                      onClick={() => setAutoRotate(!autoRotate)}
-                      sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                    >
-                      {autoRotate ? <PauseIcon /> : <PlayIcon />}
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title={showLabels ? '隐藏地球上的标签' : '显示地球上的标签'}>
-                    <IconButton
-                      onClick={() => setShowLabels(!showLabels)}
-                      sx={{ color: showLabels ? '#4ADE80' : 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                    >
-                      {showLabels ? <LabelIcon /> : <LabelOffIcon />}
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="重置视角">
-                    <IconButton
-                      onClick={() => cameraControllerRef.current?.reset()}
-                      sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                    >
-                      <ResetIcon />
-                    </IconButton>
-                  </Tooltip>
-                </>
-              )}
-              <Tooltip title={is3D ? '切换到2D视图' : '切换到3D视图'}>
-                <IconButton
-                  onClick={() => setIs3D(!is3D)}
-                  sx={{ color: '#EF4444', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                >
-                  {is3D ? <TwoDIcon /> : <ThreeDIcon />}
-                </IconButton>
-              </Tooltip>
-            </div>
-
-            <Typography sx={{ position: 'absolute', top: 16, left: 16, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
-              {isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
-            </Typography>
-          </Card>
+          />
+          <Typography variant="caption" color="text.secondary">23°N</Typography>
         </div>
 
-        {/* 分隔条 */}
-        {!isMobile && (
-          <div
-            onClick={() => setIsPanelOpen(!isPanelOpen)}
-            style={{
-              position: 'absolute',
-              right: isPanelOpen ? panelWidth + 8 : 16,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '32px',
-              height: '80px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              background: isPanelOpen 
-                ? 'linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)'
-                : 'linear-gradient(180deg, #EF4444 0%, #F97316 100%)',
-              borderRadius: 8,
-              zIndex: 1000,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-              transition: 'right 0.3s ease, background 0.2s ease',
-            }}
+        <Typography variant="h4" sx={{
+          textAlign: 'center',
+          mt: 2,
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          {formatDegreeMinute(sunLatitude)}
+        </Typography>
+      </div>
+
+      {/* 图例 */}
+      <div style={{ 
+        marginBottom: 16,
+        padding: 16,
+        background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.08) 100%)',
+        borderRadius: 12,
+        border: '1px solid rgba(16, 185, 129, 0.2)',
+      }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#10B981' }}>
+          📊 图例
+        </Typography>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {[
+            { color: COLORS.tropicOfCancer, label: '北回归线' },
+            { color: COLORS.tropicOfCapricorn, label: '南回归线' },
+            { color: COLORS.equator, label: '赤道' },
+            { color: COLORS.arcticCircle, label: '北极圈' },
+            { color: COLORS.antarcticCircle, label: '南极圈' },
+            { color: COLORS.sunRay, label: '太阳直射' },
+          ].map(item => (
+            <Chip
+              key={item.label}
+              label={item.label}
+              size="small"
+              sx={{
+                background: `linear-gradient(135deg, ${item.color}15 0%, ${item.color}25 100%)`,
+                border: `1px solid ${item.color}40`,
+                color: item.color,
+                fontWeight: 500,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* 知识点 */}
+      <div style={{
+        padding: 16,
+        background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.08) 100%)',
+        borderRadius: 12,
+        border: '1px solid rgba(245, 158, 11, 0.2)',
+        marginBottom: 16,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
+            💡 知识点
+          </Typography>
+          <IconButton 
+            size="small" 
+            onClick={() => setShowInfo(!showInfo)}
+            sx={{ color: '#F59E0B', '&:hover': { background: 'rgba(245, 158, 11, 0.1)' } }}
           >
-            <div style={{ color: isPanelOpen ? '#64748B' : 'white', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}>
-              {isPanelOpen ? <CollapseIcon /> : <ExpandIcon />}
-            </div>
-          </div>
-        )}
+            <InfoIcon fontSize="small" />
+          </IconButton>
+        </div>
 
-        {/* 右侧控制面板 */}
-        {!isMobile && (
-          <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: panelWidth, overflow: 'hidden', transition: 'width 0.3s ease' }}>
-            <Card sx={{
-              height: '100%',
-              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-              borderRadius: 4,
-              overflow: 'auto',
-              width: 320,
-              opacity: isPanelOpen ? 1 : 0,
-              transition: 'opacity 0.2s ease',
-            }}>
-              <CardContent sx={{ p: 2 }}>
-                {/* 标题 */}
-                <div style={{ 
-                  marginBottom: 20,
-                  padding: 16,
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(249, 115, 22, 0.1) 100%)',
-                  borderRadius: 12,
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                }}>
-                  <Typography variant="h5" sx={{
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    mb: 0.5,
-                  }}>
-                    🌍 南北回归线
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Tropic of Cancer & Capricorn
-                  </Typography>
-                </div>
+        <AnimatePresence>
+          {showInfo && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <div style={{ background: 'rgba(255, 255, 255, 0.6)', borderRadius: 8, padding: 12, fontSize: '13px', lineHeight: 1.8 }}>
+                <p style={{ margin: '0 0 8px' }}>
+                  <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射最北界线
+                </p>
+                <p style={{ margin: '0 0 8px' }}>
+                  <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射最南界线
+                </p>
+                <p style={{ margin: '0 0 8px' }}>
+                  <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可以直射的区域
+                </p>
+                <p style={{ margin: '0 0 8px' }}>
+                  <strong style={{ color: '#4ADE80' }}>🔄 公转方向</strong>：从北极上空俯视，地球绕太阳逆时针公转
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong style={{ color: '#F59E0B' }}>回归线的意义</strong>：是热带与温带的分界线
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                {/* 季节选择 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 16,
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#EF4444' }}>
-                    🗓️ 选择节气
-                  </Typography>
-                  
-                  <ToggleButtonGroup
-                    value={currentSeason}
-                    exclusive
-                    onChange={(_, value) => value && handleSeasonChange(value)}
-                    sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}
-                  >
-                    {(Object.keys(SEASONS) as SeasonType[]).map(season => (
-                      <ToggleButton 
-                        key={season} 
-                        value={season}
-                        sx={{
-                          flex: '1 1 45%',
-                          borderRadius: '8px !important',
-                          border: '1px solid rgba(239, 68, 68, 0.3) !important',
-                          '&.Mui-selected': {
-                            background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-                            color: 'white',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #DC2626 0%, #EA580C 100%)',
-                            },
-                          },
-                        }}
-                      >
-                        {SEASONS[season].emoji} {SEASONS[season].name}
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
-
-                  <div style={{ marginTop: 12, padding: 12, background: 'rgba(255,255,255,0.5)', borderRadius: 8 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#EF4444' }}>
-                      {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name} · {SEASONS[currentSeason].date}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {SEASONS[currentSeason].description}
-                    </Typography>
-                  </div>
-                </div>
-
-                {/* 直射点控制 */}
-                <div style={{
-                  background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.08) 0%, rgba(249, 115, 22, 0.08) 100%)',
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 16,
-                  border: '1px solid rgba(251, 191, 36, 0.2)',
-                }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: '#FBBF24' }}>
-                    ☀️ 太阳直射点纬度
-                  </Typography>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <Typography variant="caption" color="text.secondary">23°S</Typography>
-                    <Slider
-                      value={sunLatitude}
-                      onChange={(_, v) => {
-                        const lat = v as number;
-                        setSunLatitude(lat);
-                        // 根据纬度同步更新季节和公转位置
-                        // 纬度范围: -23.43 (冬至) 到 +23.43 (夏至)
-                        // 使用反余弦计算对应的公转进度
-                        // latitude = -OBLIQUITY * cos(progress * 2π)
-                        // cos(progress * 2π) = -latitude / OBLIQUITY
-                        // progress * 2π = acos(-latitude / OBLIQUITY)
-                        // 注意：acos返回0到π，需要处理下半周期
-                        const normalizedLat = Math.max(-1, Math.min(1, -lat / OBLIQUITY));
-                        const angle = Math.acos(normalizedLat); // 0 到 π
-                        // 判断是在上半年还是下半年（春分到秋分 vs 秋分到春分）
-                        // 这里简化处理：假设在上半年（冬至→春分→夏至）
-                        const progress = angle / (2 * Math.PI);
-                        setOrbitProgress(progress);
-                        // 更新季节
-                        if (lat > OBLIQUITY * 0.9) {
-                          setCurrentSeason('summer');
-                        } else if (lat < -OBLIQUITY * 0.9) {
-                          setCurrentSeason('winter');
-                        } else if (Math.abs(lat) < OBLIQUITY * 0.1) {
-                          // 接近赤道，根据滑动方向判断是春分还是秋分
-                          // 简化：默认显示春分
-                          setCurrentSeason('spring');
-                        } else if (lat > 0) {
-                          setCurrentSeason('spring');
-                        } else {
-                          setCurrentSeason('autumn');
-                        }
-                        setIsYearAnimating(false);
-                      }}
-                      min={-OBLIQUITY}
-                      max={OBLIQUITY}
-                      step={0.5}
-                      marks={[
-                        { value: -OBLIQUITY, label: '' },
-                        { value: 0, label: '' },
-                        { value: OBLIQUITY, label: '' },
-                      ]}
-                      sx={{
-                        flex: 1,
-                        '& .MuiSlider-thumb': {
-                          background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
-                          boxShadow: '0 2px 8px rgba(251, 191, 36, 0.4)',
-                        },
-                        '& .MuiSlider-track': {
-                          background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)',
-                        },
-                      }}
-                    />
-                    <Typography variant="caption" color="text.secondary">23°N</Typography>
-                  </div>
-
-                  <Typography variant="h4" sx={{
-                    textAlign: 'center',
-                    mt: 2,
-                    fontWeight: 700,
-                    background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)',
-                    backgroundClip: 'text',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                  }}>
-                    {formatDegreeMinute(sunLatitude)}
-                  </Typography>
-                </div>
-
-                {/* 图例 */}
-                <div style={{ 
-                  marginBottom: 16,
-                  padding: 16,
-                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(52, 211, 153, 0.08) 100%)',
-                  borderRadius: 12,
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
-                }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#10B981' }}>
-                    📊 图例
-                  </Typography>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {[
-                      { color: COLORS.tropicOfCancer, label: '北回归线' },
-                      { color: COLORS.tropicOfCapricorn, label: '南回归线' },
-                      { color: COLORS.equator, label: '赤道' },
-                      { color: COLORS.arcticCircle, label: '北极圈' },
-                      { color: COLORS.antarcticCircle, label: '南极圈' },
-                      { color: COLORS.sunRay, label: '太阳直射' },
-                    ].map(item => (
-                      <Chip
-                        key={item.label}
-                        label={item.label}
-                        size="small"
-                        sx={{
-                          background: `linear-gradient(135deg, ${item.color}15 0%, ${item.color}25 100%)`,
-                          border: `1px solid ${item.color}40`,
-                          color: item.color,
-                          fontWeight: 500,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* 知识点 */}
-                <div style={{
-                  padding: 16,
-                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.08) 100%)',
-                  borderRadius: 12,
-                  border: '1px solid rgba(245, 158, 11, 0.2)',
-                  marginBottom: 16,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
-                      💡 知识点
-                    </Typography>
-                    <IconButton 
-                      size="small" 
-                      onClick={() => setShowInfo(!showInfo)}
-                      sx={{ color: '#F59E0B', '&:hover': { background: 'rgba(245, 158, 11, 0.1)' } }}
-                    >
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </div>
-
-                  <AnimatePresence>
-                    {showInfo && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                      >
-                        <div style={{ background: 'rgba(255, 255, 255, 0.6)', borderRadius: 8, padding: 12, fontSize: '13px', lineHeight: 1.8 }}>
-                          <p style={{ margin: '0 0 8px' }}>
-                            <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射最北界线
-                          </p>
-                          <p style={{ margin: '0 0 8px' }}>
-                            <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射最南界线
-                          </p>
-                          <p style={{ margin: '0 0 8px' }}>
-                            <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可以直射的区域
-                          </p>
-                          <p style={{ margin: '0 0 8px' }}>
-                            <strong style={{ color: '#4ADE80' }}>🔄 公转方向</strong>：从北极上空俯视，地球绕太阳逆时针公转
-                          </p>
-                          <p style={{ margin: 0 }}>
-                            <strong style={{ color: '#F59E0B' }}>回归线的意义</strong>：是热带与温带的分界线
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {!showInfo && (
-                    <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8, fontSize: '13px' }}>
-                      南北回归线是太阳直射的南北界限，纬度为 <strong style={{ color: '#F59E0B' }}>23°26′</strong>，与黄赤交角相等。
-                    </Typography>
-                  )}
-                </div>
-
-                {/* 试试看 */}
-                <div style={{
-                  padding: 16,
-                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(244, 114, 182, 0.08) 100%)',
-                  borderRadius: 12,
-                  border: '1px solid rgba(236, 72, 153, 0.2)',
-                }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#EC4899' }}>
-                    🎯 试试看
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
-                    • 切换到<strong style={{ color: '#EC4899' }}>夏至</strong>，观察直射点位置
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
-                    • 滑动调节直射点，观察它只能在回归线之间移动
-                  </Typography>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* 移动端底部控制面板 */}
-        {isMobile && (
-          <MobileControlPanel
-            currentSeason={currentSeason}
-            setCurrentSeason={handleSeasonChange}
-            sunLatitude={sunLatitude}
-            setSunLatitude={setSunLatitude}
-            showInfo={showInfo}
-            setShowInfo={setShowInfo}
-          />
+        {!showInfo && (
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8, fontSize: '13px' }}>
+            南北回归线是太阳直射的南北界限，纬度为 <strong style={{ color: '#F59E0B' }}>23°26′</strong>，与黄赤交角相等。
+          </Typography>
         )}
       </div>
-    </>
+
+      {/* 试试看 */}
+      <div style={{
+        padding: 16,
+        background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(244, 114, 182, 0.08) 100%)',
+        borderRadius: 12,
+        border: '1px solid rgba(236, 72, 153, 0.2)',
+      }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#EC4899' }}>
+          🎯 试试看
+        </Typography>
+        <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+          • 切换到<strong style={{ color: '#EC4899' }}>夏至</strong>，观察直射点位置
+        </Typography>
+        <Typography variant="body2" sx={{ fontSize: '13px', color: 'text.secondary', lineHeight: 1.8 }}>
+          • 滑动调节直射点，观察它只能在回归线之间移动
+        </Typography>
+      </div>
+    </CardContent>
+  );
+
+  // 移动端控制面板
+  const mobileControlPanel = (
+    <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+      {/* 标题 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Typography variant="h6" sx={{
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          🌍 南北回归线
+        </Typography>
+        <Typography variant="h6" sx={{
+          fontWeight: 700,
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          {SEASONS[currentSeason].emoji} {SEASONS[currentSeason].name}
+        </Typography>
+      </div>
+
+      {/* 季节选择 */}
+      <div style={{ background: 'rgba(239, 68, 68, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>选择节气</Typography>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {(Object.keys(SEASONS) as SeasonType[]).map(season => (
+            <Chip
+              key={season}
+              label={`${SEASONS[season].emoji} ${SEASONS[season].name}`}
+              onClick={() => handleSeasonChange(season)}
+              sx={{
+                background: currentSeason === season 
+                  ? 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)' 
+                  : 'rgba(239, 68, 68, 0.1)',
+                color: currentSeason === season ? 'white' : '#EF4444',
+                fontWeight: 600,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* 直射点滑块 */}
+      <div style={{ background: 'rgba(251, 191, 36, 0.08)', borderRadius: 12, padding: 12, marginBottom: 12 }}>
+        <Typography variant="caption" color="text.secondary">太阳直射点纬度</Typography>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Typography variant="caption">23°S</Typography>
+          <Slider
+            value={sunLatitude}
+            onChange={handleSunLatitudeChange}
+            min={-OBLIQUITY}
+            max={OBLIQUITY}
+            step={0.5}
+            sx={{
+              flex: 1,
+              '& .MuiSlider-thumb': { background: 'linear-gradient(135deg, #FBBF24 0%, #F97316 100%)' },
+              '& .MuiSlider-track': { background: 'linear-gradient(90deg, #3B82F6 0%, #10B981 50%, #EF4444 100%)' },
+            }}
+          />
+          <Typography variant="caption">23°N</Typography>
+        </div>
+        <Typography variant="body2" sx={{ textAlign: 'center', mt: 1, fontWeight: 700, color: '#FBBF24' }}>
+          {formatDegreeMinute(sunLatitude)}
+        </Typography>
+      </div>
+
+      {/* 图例 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+        {[
+          { color: COLORS.tropicOfCancer, label: '北回归线' },
+          { color: COLORS.tropicOfCapricorn, label: '南回归线' },
+          { color: COLORS.equator, label: '赤道' },
+        ].map(item => (
+          <Chip
+            key={item.label}
+            label={item.label}
+            size="small"
+            sx={{
+              background: `${item.color}20`,
+              border: `1px solid ${item.color}40`,
+              color: item.color,
+              fontWeight: 500,
+              fontSize: '11px',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* 知识点 */}
+      <div
+        onClick={() => setShowInfo(!showInfo)}
+        style={{ background: 'rgba(245, 158, 11, 0.08)', borderRadius: 12, padding: 12, cursor: 'pointer' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>💡 知识点</Typography>
+          <motion.div animate={{ rotate: showInfo ? 180 : 0 }}>
+            <ExpandMoreIcon sx={{ color: '#F59E0B', fontSize: 20 }} />
+          </motion.div>
+        </div>
+        
+        <AnimatePresence>
+          {showInfo && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+            >
+              <div style={{ paddingTop: 8, fontSize: 13, lineHeight: 1.8 }}>
+                <p style={{ margin: '0 0 4px' }}>
+                  <strong style={{ color: COLORS.tropicOfCancer }}>北回归线</strong>：23°26′N，夏至日太阳直射
+                </p>
+                <p style={{ margin: '0 0 4px' }}>
+                  <strong style={{ color: COLORS.tropicOfCapricorn }}>南回归线</strong>：23°26′S，冬至日太阳直射
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong style={{ color: COLORS.equator }}>热带</strong>：南北回归线之间，太阳可直射区域
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+
+  return (
+    <AnimationPageLayout
+      scene3D={scene3D}
+      scene2D={scene2D}
+      controlPanel={controlPanel}
+      mobileControlPanel={mobileControlPanel}
+      bottomControls={bottomControls}
+      controlHint={(isMobile) => isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
+      panelWidth={320}
+    />
   );
 }

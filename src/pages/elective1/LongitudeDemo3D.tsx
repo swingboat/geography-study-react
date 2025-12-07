@@ -25,25 +25,20 @@ import {
   Typography,
   Slider,
   Chip,
-  useTheme,
-  useMediaQuery,
   IconButton,
   Tooltip,
-  ToggleButton,
-  ToggleButtonGroup,
-  LinearProgress,
+  TextField,
+  CircularProgress,
+  InputAdornment,
 } from '@mui/material';
 import {
   PlayArrow as PlayIcon,
   Pause as PauseIcon,
   RestartAlt as ResetIcon,
-  Info as InfoIcon,
-  ChevronLeft as CollapseIcon,
-  ChevronRight as ExpandIcon,
-  ThreeDRotation as ThreeDIcon,
-  ExpandMore as ExpandMoreIcon,
   Label as LabelIcon,
   LabelOff as LabelOffIcon,
+  ExpandMore as ExpandMoreIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 
 // 导入公共组件和工具
@@ -51,8 +46,10 @@ import {
   ASTRONOMY_COLORS,
 } from '../../shared/constants';
 import {
-  TwoDIcon,
   CameraController,
+  LatitudeLine,
+  AnimationPageLayout,
+  SceneLoading,
   type CameraControllerHandle,
 } from '../../shared/components';
 
@@ -72,6 +69,11 @@ const COLORS = {
   selectedMeridian: '#10B981',   // 选中的经线 - 绿色
   dateLine: '#8B5CF6',           // 国际日期变更线 - 紫色
   equator: '#10B981',            // 赤道 - 绿色
+  tropicOfCancer: '#F97316',     // 北回归线 - 橙色
+  tropicOfCapricorn: '#F97316',  // 南回归线 - 橙色
+  arcticCircle: '#06B6D4',       // 北极圈 - 青色
+  antarcticCircle: '#06B6D4',    // 南极圈 - 青色
+  latitudeLine: '#94A3B8',       // 普通纬度线 - 灰色
 };
 
 /** 格式化经度 */
@@ -262,32 +264,6 @@ function MeridianLine({
         />
       )}
     </group>
-  );
-}
-
-/** 赤道线组件 */
-function EquatorLine() {
-  const radius = 2.01;
-  
-  const points = useMemo(() => {
-    const pts: [number, number, number][] = [];
-    for (let i = 0; i <= 64; i++) {
-      const angle = (i / 64) * Math.PI * 2;
-      pts.push([
-        Math.cos(angle) * radius,
-        0,
-        Math.sin(angle) * radius,
-      ]);
-    }
-    return pts;
-  }, []);
-
-  return (
-    <Line
-      points={points}
-      color={COLORS.equator}
-      lineWidth={2}
-    />
   );
 }
 
@@ -520,7 +496,65 @@ function Earth({
         </mesh>
 
         {/* 赤道 */}
-        <EquatorLine />
+        <LatitudeLine 
+          latitude={0} 
+          radius={2.01} 
+          color={COLORS.equator} 
+          label="赤道 0°"
+          showLabel={false}
+        />
+
+        {/* 北回归线 23.5°N */}
+        <LatitudeLine 
+          latitude={23.5} 
+          radius={2.01} 
+          color={COLORS.tropicOfCancer} 
+          label="北回归线 23.5°N"
+          showLabel={showLabels}
+        />
+
+        {/* 南回归线 23.5°S */}
+        <LatitudeLine 
+          latitude={-23.5} 
+          radius={2.01} 
+          color={COLORS.tropicOfCapricorn} 
+          label="南回归线 23.5°S"
+          showLabel={showLabels}
+        />
+
+        {/* 北极圈 66.5°N */}
+        <LatitudeLine 
+          latitude={66.5} 
+          radius={2.01} 
+          color={COLORS.arcticCircle} 
+          label="北极圈 66.5°N"
+          showLabel={showLabels}
+          dashed
+        />
+
+        {/* 南极圈 66.5°S */}
+        <LatitudeLine 
+          latitude={-66.5} 
+          radius={2.01} 
+          color={COLORS.antarcticCircle} 
+          label="南极圈 66.5°S"
+          showLabel={showLabels}
+          dashed
+        />
+
+        {/* 其他主要纬度线 - 30°N, 60°N, 30°S, 60°S */}
+        {[30, 60, -30, -60].map(lat => (
+          <LatitudeLine 
+            key={lat}
+            latitude={lat} 
+            radius={2.01} 
+            color={COLORS.latitudeLine} 
+            label={`${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`}
+            showLabel={showLabels}
+            dashed
+            lineWidth={1}
+          />
+        ))}
 
         {/* 本初子午线 (0°) - 始终显示 */}
         <MeridianLine 
@@ -678,7 +712,7 @@ function Scene({
       </Suspense>
       
       {/* 相机控制 */}
-      <CameraController ref={cameraRef} defaultPosition={[6, 2, 6]} />
+      <CameraController ref={cameraRef} defaultPosition={[8, 2, 0]} />
     </>
   );
 }
@@ -799,12 +833,25 @@ function TwoDView({
 
 // ===================== 控制面板 =====================
 
+/** 自定义城市类型 */
+interface CustomCity {
+  name: string;
+  longitude: number;
+  latitude: number;
+  emoji: string;
+  description: string;
+  isCustom: true;
+}
+
 interface ControlPanelProps {
   selectedLongitude: number;
   setSelectedLongitude: (value: number) => void;
   cities: typeof FAMOUS_CITIES;
   selectedCity: string | null;
   onCityClick: (name: string) => void;
+  customCities: CustomCity[];
+  onSearchCity: (cityName: string) => Promise<void>;
+  isSearching: boolean;
 }
 
 function ControlPanel({
@@ -813,8 +860,25 @@ function ControlPanel({
   cities,
   selectedCity,
   onCityClick,
+  customCities,
+  onSearchCity,
+  isSearching,
 }: ControlPanelProps) {
-  const selectedCityData = cities.find(c => c.name === selectedCity);
+  const [searchInput, setSearchInput] = useState('');
+  const selectedCityData = cities.find(c => c.name === selectedCity) || customCities.find(c => c.name === selectedCity);
+
+  const handleSearch = async () => {
+    if (searchInput.trim()) {
+      await onSearchCity(searchInput.trim());
+      setSearchInput('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
 
   return (
     <Card sx={{ 
@@ -836,6 +900,52 @@ function ControlPanel({
         }}>
           🌍 经度探索
         </Typography>
+
+        {/* 城市搜索输入框 */}
+        <div style={{ marginBottom: 16 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="输入城市名搜索..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            disabled={isSearching}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: '#9CA3AF', fontSize: 20 }} />
+                </InputAdornment>
+              ),
+              endAdornment: isSearching ? (
+                <InputAdornment position="end">
+                  <CircularProgress size={20} />
+                </InputAdornment>
+              ) : searchInput ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={handleSearch}>
+                    <SearchIcon sx={{ color: '#3B82F6', fontSize: 20 }} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: 'rgba(59, 130, 246, 0.05)',
+                '&:hover': {
+                  background: 'rgba(59, 130, 246, 0.08)',
+                },
+                '&.Mui-focused': {
+                  background: 'white',
+                },
+              },
+            }}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+            输入任意城市名，按回车搜索
+          </Typography>
+        </div>
 
         {/* 当前经度显示 */}
         <div style={{
@@ -882,10 +992,41 @@ function ControlPanel({
           </div>
         </div>
 
+        {/* 自定义城市（用户搜索添加的） */}
+        {customCities.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block', mb: 1 }}>
+              📍 搜索的城市
+            </Typography>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {customCities.map(city => (
+                <Chip
+                  key={city.name}
+                  label={`${city.emoji} ${city.name}`}
+                  size="small"
+                  onClick={() => onCityClick(city.name)}
+                  sx={{
+                    background: selectedCity === city.name 
+                      ? 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)' 
+                      : 'rgba(139, 92, 246, 0.1)',
+                    color: selectedCity === city.name ? 'white' : '#8B5CF6',
+                    fontWeight: selectedCity === city.name ? 600 : 400,
+                    '&:hover': {
+                      background: selectedCity === city.name 
+                        ? 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)' 
+                        : 'rgba(139, 92, 246, 0.2)',
+                    },
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 城市选择 */}
         <div style={{ marginBottom: 16 }}>
           <Typography variant="caption" color="text.secondary" gutterBottom sx={{ display: 'block', mb: 1 }}>
-            🏙️ 选择城市查看经度
+            🏙️ 常见城市
           </Typography>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {cities.map(city => (
@@ -1043,6 +1184,9 @@ interface MobileControlPanelProps {
   cities: typeof FAMOUS_CITIES;
   selectedCity: string | null;
   onCityClick: (name: string) => void;
+  customCities: CustomCity[];
+  onSearchCity: (cityName: string) => Promise<void>;
+  isSearching: boolean;
 }
 
 function MobileControlPanel({
@@ -1051,9 +1195,20 @@ function MobileControlPanel({
   cities,
   selectedCity,
   onCityClick,
+  customCities,
+  onSearchCity,
+  isSearching,
 }: MobileControlPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const selectedCityData = cities.find(c => c.name === selectedCity);
+  const [searchInput, setSearchInput] = useState('');
+  const selectedCityData = cities.find(c => c.name === selectedCity) || customCities.find(c => c.name === selectedCity);
+
+  const handleSearch = async () => {
+    if (searchInput.trim()) {
+      await onSearchCity(searchInput.trim());
+      setSearchInput('');
+    }
+  };
 
   return (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
@@ -1101,6 +1256,37 @@ function MobileControlPanel({
             }}
           >
             <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+              {/* 城市搜索 */}
+              <div style={{ marginBottom: 16 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="输入城市名搜索..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  disabled={isSearching}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: '#9CA3AF', fontSize: 18 }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: isSearching ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={18} />
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      background: 'rgba(59, 130, 246, 0.05)',
+                    },
+                  }}
+                />
+              </div>
+
               {/* 当前经度 */}
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
                 <Typography variant="h5" sx={{ 
@@ -1128,6 +1314,32 @@ function MobileControlPanel({
                   <Typography variant="caption" sx={{ color: COLORS.eastLongitude }}>E</Typography>
                 </div>
               </div>
+
+              {/* 搜索的城市 */}
+              {customCities.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    📍 搜索的城市
+                  </Typography>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {customCities.map(city => (
+                      <Chip
+                        key={city.name}
+                        label={`${city.emoji} ${city.name}`}
+                        size="small"
+                        onClick={() => onCityClick(city.name)}
+                        sx={{
+                          background: selectedCity === city.name 
+                            ? 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)' 
+                            : 'rgba(139, 92, 246, 0.1)',
+                          color: selectedCity === city.name ? 'white' : '#8B5CF6',
+                          fontWeight: selectedCity === city.name ? 600 : 400,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 城市选择 */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -1177,408 +1389,206 @@ function MobileControlPanel({
 export default function LongitudeDemo3D({
   initialLongitude = 116.4, // 默认北京经度
 }: LongitudeDemo3DProps) {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isPortrait = useMediaQuery('(orientation: portrait)');
-  const isSmallScreen = useMediaQuery('(max-width: 600px)');
-  
-  const shouldShowLandscapePrompt = isSmallScreen && isPortrait;
-  
   const [selectedLongitude, setSelectedLongitude] = useState(initialLongitude);
   const [autoRotate, setAutoRotate] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [showAllMeridians] = useState(true);
   const [selectedCity, setSelectedCity] = useState<string | null>('北京');
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const [is3D, setIs3D] = useState(true);
-  const [showInfo, setShowInfo] = useState(false);
-  const [dismissedLandscapePrompt, setDismissedLandscapePrompt] = useState(false);
   const [targetLongitude, setTargetLongitude] = useState<number | null>(initialLongitude);
+  const [customCities, setCustomCities] = useState<CustomCity[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
 
+  // 合并预设城市和自定义城市
+  const allCities = useMemo(() => {
+    return [...FAMOUS_CITIES, ...customCities];
+  }, [customCities]);
+
   const handleCityClick = useCallback((name: string) => {
-    const city = FAMOUS_CITIES.find(c => c.name === name);
+    const city = allCities.find(c => c.name === name);
     if (city) {
       setSelectedCity(name);
       setSelectedLongitude(city.longitude);
-      // 设置目标经度，让地球转动到该城市的位置
       setTargetLongitude(city.longitude);
+      // 重置相机位置，确保城市显示在画面中心
+      cameraControllerRef.current?.reset();
     }
-  }, []);
+  }, [allCities]);
 
-  // 横屏提示
-  if (shouldShowLandscapePrompt && !dismissedLandscapePrompt) {
-    return (
-      <div style={{
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-        padding: 24,
-        textAlign: 'center',
-      }}>
-        <motion.div
-          animate={{ rotate: [0, 90, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          style={{ fontSize: 64, marginBottom: 24 }}
-        >
-          📱
-        </motion.div>
-        <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-          建议横屏查看
-        </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 3 }}>
-          横屏模式下可以获得更好的3D交互体验
-        </Typography>
-        <Chip
-          label="继续竖屏查看"
-          onClick={() => setDismissedLandscapePrompt(true)}
-          sx={{
-            background: 'linear-gradient(135deg, #3B82F6 0%, #10B981 100%)',
-            color: 'white',
-          }}
-        />
-      </div>
-    );
-  }
+  // 搜索城市经纬度
+  const handleSearchCity = useCallback(async (cityName: string) => {
+    // 先检查是否已存在于预设城市或自定义城市中
+    const existingCity = allCities.find(c => c.name === cityName || c.name.includes(cityName) || cityName.includes(c.name));
+    if (existingCity) {
+      handleCityClick(existingCity.name);
+      return;
+    }
 
-  // 移动端布局
-  if (isMobile) {
-    return (
-      <div style={{ height: '100vh', position: 'relative', background: COLORS.space }}>
-        {/* 3D/2D 切换 */}
-        <div style={{
-          position: 'absolute',
-          top: 16,
-          left: 16,
-          zIndex: 100,
-        }}>
-          <ToggleButtonGroup
-            value={is3D ? '3d' : '2d'}
-            exclusive
-            onChange={(_, value) => value && setIs3D(value === '3d')}
-            size="small"
-            sx={{
-              background: 'rgba(255,255,255,0.9)',
-              borderRadius: 2,
-            }}
-          >
-            <ToggleButton value="3d">
-              <ThreeDIcon sx={{ fontSize: 18 }} />
-            </ToggleButton>
-            <ToggleButton value="2d">
-              <TwoDIcon />
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </div>
+    setIsSearching(true);
+    try {
+      // 使用 Nominatim API 搜索城市
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityName)}&limit=1&accept-language=zh`,
+        {
+          headers: {
+            'User-Agent': 'GeographyStudyApp/1.0',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('搜索失败');
+      }
 
-        {/* 控制按钮 */}
-        <div style={{
-          position: 'absolute',
-          top: 16,
-          right: 16,
-          zIndex: 100,
-          display: 'flex',
-          gap: 8,
-        }}>
-          <IconButton
-            onClick={() => setShowInfo(!showInfo)}
-            sx={{
-              background: 'rgba(255,255,255,0.9)',
-              '&:hover': { background: 'rgba(255,255,255,1)' },
-            }}
-          >
-            <InfoIcon />
-          </IconButton>
-        </div>
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        const longitude = parseFloat(result.lon);
+        const latitude = parseFloat(result.lat);
+        
+        // 检查是否已添加过
+        const alreadyAdded = customCities.find(c => c.name === cityName);
+        if (!alreadyAdded) {
+          const newCity: CustomCity = {
+            name: cityName,
+            longitude,
+            latitude,
+            emoji: '📍',
+            description: `经度 ${formatLongitude(longitude)}，纬度 ${latitude.toFixed(2)}°`,
+            isCustom: true,
+          };
+          setCustomCities(prev => [...prev, newCity]);
+        }
+        
+        // 选中这个城市
+        setSelectedCity(cityName);
+        setSelectedLongitude(longitude);
+        setTargetLongitude(longitude);
+        cameraControllerRef.current?.reset();
+      } else {
+        alert(`未找到城市 "${cityName}"，请尝试其他名称`);
+      }
+    } catch (error) {
+      console.error('搜索城市失败:', error);
+      alert('搜索失败，请稍后重试');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [allCities, customCities, handleCityClick]);
 
-        {/* 主视图 */}
-        <div style={{ height: '100%', paddingBottom: 60 }}>
-          {is3D ? (
-            <Canvas camera={{ position: [6, 2, 6], fov: 50 }}>
-              <Scene
-                selectedLongitude={selectedLongitude}
-                showLabels={showLabels}
-                autoRotate={autoRotate}
-                showAllMeridians={showAllMeridians}
-                cities={FAMOUS_CITIES}
-                selectedCity={selectedCity}
-                onCityClick={handleCityClick}
-                cameraRef={cameraControllerRef}
-                targetLongitude={targetLongitude}
-              />
-            </Canvas>
-          ) : (
-            <div style={{
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 16,
-            }}>
-              <TwoDView
-                selectedLongitude={selectedLongitude}
-                cities={FAMOUS_CITIES}
-                selectedCity={selectedCity}
-                onCityClick={handleCityClick}
-              />
-            </div>
-          )}
-        </div>
+  // 知识点信息内容
+  const infoContent = (
+    <>
+      <Typography variant="h6" gutterBottom sx={{ color: '#3B82F6' }}>
+        📚 经度知识点
+      </Typography>
+      <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
+        <b>1. 经度定义</b><br/>
+        经度是地球上某点与本初子午线（0°经线）之间的角度距离。<br/><br/>
+        
+        <b>2. 本初子午线</b><br/>
+        经过英国伦敦格林尼治天文台的经线，被定义为0°经线。<br/><br/>
+        
+        <b>3. 东经与西经</b><br/>
+        • 东经(E)：本初子午线以东，0°~180°<br/>
+        • 西经(W)：本初子午线以西，0°~180°<br/><br/>
+        
+        <b>4. 国际日期变更线</b><br/>
+        大致沿180°经线，跨越此线日期加减一天。<br/><br/>
+        
+        <b>5. 经度与时区</b><br/>
+        地球自转一周360°需24小时，每15°经度对应1小时时差。
+      </Typography>
+    </>
+  );
 
-        {/* 移动端控制面板 */}
-        <MobileControlPanel
-          selectedLongitude={selectedLongitude}
-          setSelectedLongitude={setSelectedLongitude}
-          cities={FAMOUS_CITIES}
-          selectedCity={selectedCity}
-          onCityClick={handleCityClick}
-        />
-
-        {/* 信息弹窗 */}
-        <AnimatePresence>
-          {showInfo && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowInfo(false)}
-              style={{
-                position: 'fixed',
-                inset: 0,
-                background: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 200,
-                padding: 16,
-              }}
-            >
-              <Card sx={{ maxWidth: 400, maxHeight: '80vh', overflow: 'auto' }}>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ color: '#3B82F6' }}>
-                    📚 经度知识点
-                  </Typography>
-                  <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
-                    <b>1. 经度定义</b><br/>
-                    经度是地球上某点与本初子午线（0°经线）之间的角度距离。<br/><br/>
-                    
-                    <b>2. 本初子午线</b><br/>
-                    经过英国伦敦格林尼治天文台的经线，被定义为0°经线。<br/><br/>
-                    
-                    <b>3. 东经与西经</b><br/>
-                    • 东经(E)：本初子午线以东，0°~180°<br/>
-                    • 西经(W)：本初子午线以西，0°~180°<br/><br/>
-                    
-                    <b>4. 国际日期变更线</b><br/>
-                    大致沿180°经线，跨越此线日期加减一天。<br/><br/>
-                    
-                    <b>5. 经度与时区</b><br/>
-                    地球自转一周360°需24小时，每15°经度对应1小时时差。
-                  </Typography>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
-
-  const panelWidth = isPanelOpen ? 340 : 0;
-
-  const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: isMobile ? 'column' : 'row',
-    height: isMobile ? '100vh' : 'calc(100vh - 120px)',
-    minHeight: isMobile ? '100vh' : '500px',
-    maxHeight: isMobile ? '100vh' : 'calc(100vh - 120px)',
-    position: 'relative',
-    overflow: 'hidden',
-  };
-
-  const sceneContainerStyle: React.CSSProperties = {
-    flex: 1,
-    height: isMobile ? '100%' : '100%',
-    minHeight: isMobile ? '100%' : 'auto',
-    marginRight: isMobile ? 0 : `${panelWidth + 40}px`,
-    transition: 'margin-right 0.3s ease',
-    paddingBottom: isMobile ? 60 : 0,
-  };
-
-  // 桌面端布局
   return (
-    <div style={containerStyle}>
-      {/* 左侧 3D/2D 视图区域 */}
-      <div key={`scene-container-${isPanelOpen}`} style={sceneContainerStyle}>
-        <Card
-          component={motion.div}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          sx={{
-            height: '100%',
-            background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-            borderRadius: 4,
-            overflow: 'hidden',
-            position: 'relative',
-          }}
-        >
-          {is3D ? (
-            <Suspense fallback={
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column', gap: 16 }}>
-                <Typography color="white">🚀 加载 3D 场景中...</Typography>
-                <LinearProgress sx={{ width: '50%' }} />
-              </div>
-            }>
-              <Canvas camera={{ position: [6, 2, 6], fov: 50 }} style={{ width: '100%', height: '100%' }}>
-                <Scene
-                  selectedLongitude={selectedLongitude}
-                  showLabels={showLabels}
-                  autoRotate={autoRotate}
-                  showAllMeridians={showAllMeridians}
-                  cities={FAMOUS_CITIES}
-                  selectedCity={selectedCity}
-                  onCityClick={handleCityClick}
-                  cameraRef={cameraControllerRef}
-                  targetLongitude={targetLongitude}
-                />
-              </Canvas>
-            </Suspense>
-          ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-              <TwoDView
-                selectedLongitude={selectedLongitude}
-                cities={FAMOUS_CITIES}
-                selectedCity={selectedCity}
-                onCityClick={handleCityClick}
-              />
-            </div>
-          )}
-
-          {/* 底部控制按钮 */}
-          <div style={{
-            position: 'absolute',
-            bottom: 16,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: 8,
-            background: 'rgba(255,255,255,0.1)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: 12,
-            padding: 8,
-          }}>
-            {is3D && (
-              <>
-                <Tooltip title={autoRotate ? '暂停地球自转' : '开启地球自转'}>
-                  <IconButton
-                    onClick={() => setAutoRotate(!autoRotate)}
-                    sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                  >
-                    {autoRotate ? <PauseIcon /> : <PlayIcon />}
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title={showLabels ? '隐藏地球上的标签' : '显示地球上的标签'}>
-                  <IconButton
-                    onClick={() => setShowLabels(!showLabels)}
-                    sx={{ color: showLabels ? '#4ADE80' : 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                  >
-                    {showLabels ? <LabelIcon /> : <LabelOffIcon />}
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="重置视角">
-                  <IconButton
-                    onClick={() => cameraControllerRef.current?.reset()}
-                    sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-                  >
-                    <ResetIcon />
-                  </IconButton>
-                </Tooltip>
-              </>
-            )}
-            <Tooltip title={is3D ? '切换到2D视图' : '切换到3D视图'}>
-              <IconButton
-                onClick={() => setIs3D(!is3D)}
-                sx={{ color: '#3B82F6', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
-              >
-                {is3D ? <TwoDIcon /> : <ThreeDIcon />}
-              </IconButton>
-            </Tooltip>
-          </div>
-
-          <Typography sx={{ position: 'absolute', top: 16, left: 16, color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>
-            {isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
-          </Typography>
-        </Card>
-      </div>
-
-      {/* 分隔条 */}
-      {!isMobile && (
-        <div
-          onClick={() => setIsPanelOpen(!isPanelOpen)}
-          style={{
-            position: 'absolute',
-            right: isPanelOpen ? panelWidth + 8 : 16,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: '32px',
-            height: '80px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            background: isPanelOpen 
-              ? 'linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%)'
-              : 'linear-gradient(180deg, #3B82F6 0%, #10B981 100%)',
-            borderRadius: 8,
-            zIndex: 1000,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-            transition: 'right 0.3s ease, background 0.2s ease',
-          }}
-        >
-          <div style={{ color: isPanelOpen ? '#64748B' : 'white', display: 'flex', alignItems: 'center', transition: 'color 0.2s ease' }}>
-            {isPanelOpen ? <CollapseIcon /> : <ExpandIcon />}
-          </div>
-        </div>
-      )}
-
-      {/* 右侧控制面板 */}
-      {!isMobile && (
-        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: panelWidth, overflow: 'hidden', transition: 'width 0.3s ease' }}>
-          <Card sx={{
-            height: '100%',
-            background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
-            borderRadius: 4,
-            overflow: 'auto',
-            width: 340,
-            opacity: isPanelOpen ? 1 : 0,
-            transition: 'opacity 0.2s ease',
-          }}>
-            <ControlPanel
+    <AnimationPageLayout
+      scene3D={
+        <Suspense fallback={<SceneLoading />}>
+          <Canvas camera={{ position: [8, 2, 0], fov: 50 }} style={{ width: '100%', height: '100%' }}>
+            <Scene
               selectedLongitude={selectedLongitude}
-              setSelectedLongitude={setSelectedLongitude}
-              cities={FAMOUS_CITIES}
+              showLabels={showLabels}
+              autoRotate={autoRotate}
+              showAllMeridians={showAllMeridians}
+              cities={allCities}
               selectedCity={selectedCity}
               onCityClick={handleCityClick}
+              cameraRef={cameraControllerRef}
+              targetLongitude={targetLongitude}
             />
-          </Card>
-        </div>
-      )}
-
-      {/* 移动端底部控制面板 */}
-      {isMobile && (
+          </Canvas>
+        </Suspense>
+      }
+      scene2D={
+        <TwoDView
+          selectedLongitude={selectedLongitude}
+          cities={allCities}
+          selectedCity={selectedCity}
+          onCityClick={handleCityClick}
+        />
+      }
+      controlPanel={
+        <ControlPanel
+          selectedLongitude={selectedLongitude}
+          setSelectedLongitude={setSelectedLongitude}
+          cities={FAMOUS_CITIES}
+          selectedCity={selectedCity}
+          onCityClick={handleCityClick}
+          customCities={customCities}
+          onSearchCity={handleSearchCity}
+          isSearching={isSearching}
+        />
+      }
+      mobileControlPanel={
         <MobileControlPanel
           selectedLongitude={selectedLongitude}
           setSelectedLongitude={setSelectedLongitude}
           cities={FAMOUS_CITIES}
           selectedCity={selectedCity}
           onCityClick={handleCityClick}
+          customCities={customCities}
+          onSearchCity={handleSearchCity}
+          isSearching={isSearching}
         />
+      }
+      bottomControls={(is3D) => (
+        <>
+          {is3D && (
+            <>
+              <Tooltip title={autoRotate ? '暂停地球自转' : '开启地球自转'}>
+                <IconButton
+                  onClick={() => setAutoRotate(!autoRotate)}
+                  sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                >
+                  {autoRotate ? <PauseIcon /> : <PlayIcon />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title={showLabels ? '隐藏地球上的标签' : '显示地球上的标签'}>
+                <IconButton
+                  onClick={() => setShowLabels(!showLabels)}
+                  sx={{ color: showLabels ? '#4ADE80' : 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                >
+                  {showLabels ? <LabelIcon /> : <LabelOffIcon />}
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="重置视角">
+                <IconButton
+                  onClick={() => cameraControllerRef.current?.reset()}
+                  sx={{ color: 'white', '&:hover': { background: 'rgba(255,255,255,0.2)' } }}
+                >
+                  <ResetIcon />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+        </>
       )}
-    </div>
+      infoContent={infoContent}
+      controlHint={(mobile) => mobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
+    />
   );
 }

@@ -248,11 +248,13 @@ function Sun3D({ subsolarLat, showSunRays }: { subsolarLat: number; showSunRays:
 function TerminatorLine({ 
   subsolarLat, 
   showLabels,
-  hourOffset = 0, // 0 = 晨昏线, 6 = 正午线
+  showDawn = true,
+  showDusk = true,
 }: { 
   subsolarLat: number;
   showLabels: boolean;
-  hourOffset?: number;
+  showDawn?: boolean;
+  showDusk?: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
@@ -260,55 +262,79 @@ function TerminatorLine({
   const [duskVisible, setDuskVisible] = useState(true);
 
   // 晨昏线是与太阳光线垂直的大圆
-  // hourOffset: 0 = 晨昏线（6:00/18:00），6 = 正午/午夜线（12:00/0:00）
-  const points = useMemo(() => {
+  // 正午线在 X-Y 平面 (z=0)，经度 0°
+  // 晨线在正午线西边 90°，即 +Z 方向，经度 90°W（或 270°E）
+  // 昏线在正午线东边 90°，即 -Z 方向，经度 90°E
+  
+  // 晨线点：从南极到北极，经过 +Z 方向（西经90°）
+  // 晨昏线需要根据太阳直射点纬度倾斜
+  const dawnPoints = useMemo(() => {
     const pts: [number, number, number][] = [];
     const radius = 2.02;
     const subsolarLatRad = subsolarLat * Math.PI / 180;
-    const offsetRad = (hourOffset * 15) * Math.PI / 180; // 每小时15度
     
-    for (let i = 0; i <= 360; i += 2) {
-      const angle = (i * Math.PI) / 180;
+    // 晨线在 Y-Z 平面上（x=0, z>0 的半圆），然后根据直射点纬度倾斜
+    for (let i = -90; i <= 90; i += 2) {
+      const latRad = (i * Math.PI) / 180;
       
-      // 晨昏线是过地心的大圆，垂直于太阳光线
-      // 首先在XZ平面创建一个圆，然后绕Y轴旋转（根据时区偏移），再绕Z轴倾斜（根据太阳直射点纬度）
-      let x = Math.cos(angle) * radius;
-      let y = Math.sin(angle) * radius;
-      let z = 0;
+      // 基础位置：在 Y-Z 平面的半圆（z > 0）
+      let x = 0;
+      let y = Math.sin(latRad) * radius;
+      let z = Math.cos(latRad) * radius;
       
-      // 绕Y轴旋转（时区偏移）
-      const cosOffset = Math.cos(offsetRad);
-      const sinOffset = Math.sin(offsetRad);
-      const x1 = x * cosOffset - z * sinOffset;
-      const z1 = x * sinOffset + z * cosOffset;
-      x = x1;
-      z = z1;
-      
-      // 绕Z轴倾斜（根据太阳直射点纬度）
-      const cosLat = Math.cos(subsolarLatRad);
-      const sinLat = Math.sin(subsolarLatRad);
+      // 绕 Z 轴旋转（根据太阳直射点纬度倾斜晨昏线）
+      // 当太阳直射北半球时，晨昏线向北极方向倾斜
+      const cosLat = Math.cos(-subsolarLatRad);
+      const sinLat = Math.sin(-subsolarLatRad);
       const x2 = x * cosLat - y * sinLat;
       const y2 = x * sinLat + y * cosLat;
       
       pts.push([x2, y2, z]);
     }
     return pts;
-  }, [subsolarLat, hourOffset]);
+  }, [subsolarLat]);
 
-  // 计算晨线和昏线标签位置
-  // 晨线在地球的+Z侧（面向相机时的右侧），昏线在-Z侧
-  const dawnPosition = useMemo(() => {
-    const radius = 2.2;
+  // 昏线点：从北极到南极，经过 -Z 方向（东经90°）
+  const duskPoints = useMemo(() => {
+    const pts: [number, number, number][] = [];
+    const radius = 2.02;
     const subsolarLatRad = subsolarLat * Math.PI / 180;
     
-    // 晨线上赤道位置的点：在+Z方向
+    // 昏线在 Y-Z 平面上（x=0, z<0 的半圆）
+    for (let i = 90; i >= -90; i -= 2) {
+      const latRad = (i * Math.PI) / 180;
+      
+      // 基础位置：在 Y-Z 平面的半圆（z < 0）
+      let x = 0;
+      let y = Math.sin(latRad) * radius;
+      let z = -Math.cos(latRad) * radius;
+      
+      // 绕 Z 轴旋转（根据太阳直射点纬度倾斜晨昏线）
+      const cosLat = Math.cos(-subsolarLatRad);
+      const sinLat = Math.sin(-subsolarLatRad);
+      const x2 = x * cosLat - y * sinLat;
+      const y2 = x * sinLat + y * cosLat;
+      
+      pts.push([x2, y2, z]);
+    }
+    return pts;
+  }, [subsolarLat]);
+
+  // 计算晨线和昏线标签位置
+  // 晨线在地球的+Z侧，昏线在-Z侧
+  const dawnPosition = useMemo(() => {
+    const radius = 2.3;
+    const subsolarLatRad = subsolarLat * Math.PI / 180;
+    
+    // 晨线上赤道位置的点：在+Z方向（x=0, y=0, z=radius）
+    // 然后根据太阳直射点纬度倾斜
     let x = 0;
     let y = 0;
     let z = radius;
     
-    // 绕Z轴倾斜（与晨昏线相同的旋转）
-    const cosLat = Math.cos(subsolarLatRad);
-    const sinLat = Math.sin(subsolarLatRad);
+    // 绕Z轴倾斜（与晨昏线相同的旋转，注意是负的subsolarLatRad）
+    const cosLat = Math.cos(-subsolarLatRad);
+    const sinLat = Math.sin(-subsolarLatRad);
     const x2 = x * cosLat - y * sinLat;
     const y2 = x * sinLat + y * cosLat;
     
@@ -316,7 +342,7 @@ function TerminatorLine({
   }, [subsolarLat]);
 
   const duskPosition = useMemo(() => {
-    const radius = 2.2;
+    const radius = 2.3;
     const subsolarLatRad = subsolarLat * Math.PI / 180;
     
     // 昏线上赤道位置的点：在-Z方向
@@ -324,8 +350,8 @@ function TerminatorLine({
     let y = 0;
     let z = -radius;
     
-    const cosLat = Math.cos(subsolarLatRad);
-    const sinLat = Math.sin(subsolarLatRad);
+    const cosLat = Math.cos(-subsolarLatRad);
+    const sinLat = Math.sin(-subsolarLatRad);
     const x2 = x * cosLat - y * sinLat;
     const y2 = x * sinLat + y * cosLat;
     
@@ -348,18 +374,27 @@ function TerminatorLine({
     }
   });
 
-  const lineColor = hourOffset === 0 ? COLORS.terminatorLine : COLORS.noonLine;
-
   return (
     <group ref={groupRef}>
-      <Line
-        points={points}
-        color={lineColor}
-        lineWidth={3}
-      />
+      {/* 晨线 - 绿色 */}
+      {showDawn && (
+        <Line
+          points={dawnPoints}
+          color={COLORS.dawnLine}
+          lineWidth={3}
+        />
+      )}
+      {/* 昏线 - 紫色 */}
+      {showDusk && (
+        <Line
+          points={duskPoints}
+          color={COLORS.duskLine}
+          lineWidth={3}
+        />
+      )}
       
       {/* 晨线标签 */}
-      {showLabels && hourOffset === 0 && dawnVisible && (
+      {showLabels && showDawn && dawnVisible && (
         <group position={dawnPosition}>
           <Html center>
             <div style={{
@@ -378,7 +413,7 @@ function TerminatorLine({
       )}
       
       {/* 昏线标签 */}
-      {showLabels && hourOffset === 0 && duskVisible && (
+      {showLabels && showDusk && duskVisible && (
         <group position={duskPosition}>
           <Html center>
             <div style={{
@@ -399,7 +434,7 @@ function TerminatorLine({
   );
 }
 
-/** 正午线（太阳直射经线） */
+/** 正午线（太阳直射经线，即12:00地方时的经线） */
 function NoonLine({ 
   subsolarLat,
   showLabel,
@@ -411,7 +446,9 @@ function NoonLine({
   const [isVisible, setIsVisible] = useState(true);
   const { camera } = useThree();
 
-  // 正午线是太阳直射的经线（固定在X正方向，即经度0°方向）
+  // 正午线是太阳直射的经线，地方时为12:00
+  // 它是一条从北极到南极的半圆弧，位于X-Y平面上（z=0）
+  // 注意：正午线相对太阳固定，随地球自转，对应的地球经度会变化
   const points = useMemo(() => {
     const pts: [number, number, number][] = [];
     const radius = 2.02;
@@ -465,7 +502,11 @@ function NoonLine({
       <Line
         points={points}
         color={COLORS.noonLine}
-        lineWidth={2}
+        lineWidth={3}
+        dashed
+        dashSize={0.15}
+        dashScale={1}
+        gapSize={0.08}
       />
       
       {/* 太阳直射点标签 */}
@@ -481,7 +522,7 @@ function NoonLine({
               fontWeight: 600,
               whiteSpace: 'nowrap',
             }}>
-              ☀️ 直射点 12:00
+              ☀️ 太阳直射点 12:00
             </div>
           </Html>
         </group>
@@ -522,13 +563,21 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
           // 计算该点是否在夜半球
           float dotProduct = dot(normalize(vPosition), sunDir);
           
-          // 夜半球（dotProduct < 0）显示深蓝色
-          if (dotProduct < -0.02) {
-            gl_FragColor = vec4(0.1, 0.15, 0.3, 0.4);
-          } else if (dotProduct < 0.02) {
-            // 晨昏线附近的过渡区域
-            float t = (dotProduct + 0.02) / 0.04;
-            gl_FragColor = vec4(0.1, 0.15, 0.3, 0.4 * (1.0 - t));
+          // 夜半球着色 - 更黑更明显
+          if (dotProduct < -0.05) {
+            // 深夜区域 - 非常暗
+            gl_FragColor = vec4(0.02, 0.03, 0.08, 0.85);
+          } else if (dotProduct < 0.0) {
+            // 接近晨昏线的夜晚区域 - 渐变
+            float t = (dotProduct + 0.05) / 0.05;
+            float alpha = mix(0.85, 0.6, t);
+            gl_FragColor = vec4(0.03, 0.05, 0.12, alpha);
+          } else if (dotProduct < 0.05) {
+            // 晨昏线附近的过渡区域（黄昏/黎明效果）
+            float t = dotProduct / 0.05;
+            float alpha = mix(0.6, 0.0, t);
+            vec3 twilightColor = mix(vec3(0.05, 0.06, 0.15), vec3(0.3, 0.15, 0.05), t);
+            gl_FragColor = vec4(twilightColor, alpha);
           } else {
             discard;
           }
@@ -547,7 +596,7 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
 
   return (
     <mesh ref={nightRef} material={nightMaterial}>
-      <sphereGeometry args={[2.01, 64, 64]} />
+      <sphereGeometry args={[2.015, 64, 64]} />
     </mesh>
   );
 }
@@ -555,20 +604,25 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
 /** 地球组件 */
 function Earth({ 
   showLabels, 
-  autoRotate,
   subsolarLat,
-  showTerminator,
+  showDawnLine,
+  showDuskLine,
   showNoonLine,
   showShading,
+  viewMode,
+  rotationAngle,
 }: {
   showLabels: boolean;
-  autoRotate: boolean;
   subsolarLat: number;
-  showTerminator: boolean;
+  showDawnLine: boolean;
+  showDuskLine: boolean;
   showNoonLine: boolean;
   showShading: boolean;
+  viewMode: 'sun' | 'earth';
+  rotationAngle: number;
 }) {
   const earthGroupRef = useRef<THREE.Group>(null);
+  const sunRelativeGroupRef = useRef<THREE.Group>(null);
   
   const [earthMap, earthNormal, earthSpec, cloudsMap] = useTexture([
     '/textures/earth.jpg',
@@ -577,14 +631,30 @@ function Earth({
     '/textures/earth_clouds.png',
   ]);
 
-  useFrame(({ clock }) => {
-    if (earthGroupRef.current && autoRotate) {
-      earthGroupRef.current.rotation.y = clock.elapsedTime * 0.1;
+  // 根据视角模式设置旋转
+  useFrame(() => {
+    if (viewMode === 'sun') {
+      // 太阳视角：地球自转，晨昏线固定
+      if (earthGroupRef.current) {
+        earthGroupRef.current.rotation.y = rotationAngle;
+      }
+      if (sunRelativeGroupRef.current) {
+        sunRelativeGroupRef.current.rotation.y = 0;
+      }
+    } else {
+      // 地球视角：地球固定，晨昏线/太阳绕地球转
+      if (earthGroupRef.current) {
+        earthGroupRef.current.rotation.y = 0;
+      }
+      if (sunRelativeGroupRef.current) {
+        sunRelativeGroupRef.current.rotation.y = -rotationAngle;
+      }
     }
   });
 
   return (
     <group>
+      {/* 地球旋转组 - 在太阳视角下旋转 */}
       <group ref={earthGroupRef}>
         {/* 地球主体 */}
         <mesh>
@@ -612,10 +682,7 @@ function Earth({
           />
         </mesh>
 
-        {/* 昼夜着色 */}
-        {showShading && <DayNightShading subsolarLat={subsolarLat} />}
-
-        {/* 特殊纬线 */}
+        {/* 特殊纬线 - 随地球 */}
         {SPECIAL_LATITUDES.map(({ name, lat, color }) => (
           <LatitudeLine 
             key={name}
@@ -626,12 +693,20 @@ function Earth({
             showLabel={showLabels && Math.abs(lat) > 0}
           />
         ))}
+      </group>
+
+      {/* 太阳相对组 - 在地球视角下旋转 */}
+      <group ref={sunRelativeGroupRef}>
+        {/* 昼夜着色 */}
+        {showShading && <DayNightShading subsolarLat={subsolarLat} />}
 
         {/* 晨昏线 */}
-        {showTerminator && (
+        {(showDawnLine || showDuskLine) && (
           <TerminatorLine 
             subsolarLat={subsolarLat} 
             showLabels={showLabels}
+            showDawn={showDawnLine}
+            showDusk={showDuskLine}
           />
         )}
 
@@ -652,11 +727,13 @@ interface SceneProps {
   showLabels: boolean;
   autoRotate: boolean;
   subsolarLat: number;
-  showTerminator: boolean;
+  showDawnLine: boolean;
+  showDuskLine: boolean;
   showNoonLine: boolean;
   showShading: boolean;
   showSun: boolean;
   showSunRays: boolean;
+  viewMode: 'sun' | 'earth';
   cameraRef: React.RefObject<CameraControllerHandle>;
 }
 
@@ -664,13 +741,33 @@ function Scene({
   showLabels, 
   autoRotate,
   subsolarLat,
-  showTerminator,
+  showDawnLine,
+  showDuskLine,
   showNoonLine,
   showShading,
   showSun,
   showSunRays,
+  viewMode,
   cameraRef,
 }: SceneProps) {
+  const sunGroupRef = useRef<THREE.Group>(null);
+  const [rotationAngle, setRotationAngle] = useState(0);
+
+  // 处理自转动画
+  useFrame(({ clock }) => {
+    if (autoRotate) {
+      const angle = clock.elapsedTime * 0.1;
+      setRotationAngle(angle);
+      
+      // 地球视角下，太阳也要跟着转
+      if (viewMode === 'earth' && sunGroupRef.current) {
+        sunGroupRef.current.rotation.y = -angle;
+      } else if (sunGroupRef.current) {
+        sunGroupRef.current.rotation.y = 0;
+      }
+    }
+  });
+
   return (
     <>
       <ambientLight intensity={1.2} />
@@ -679,14 +776,20 @@ function Scene({
       <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
       
       <Suspense fallback={null}>
-        {showSun && <Sun3D subsolarLat={subsolarLat} showSunRays={showSunRays} />}
+        {/* 太阳组 - 在地球视角下旋转 */}
+        <group ref={sunGroupRef}>
+          {showSun && <Sun3D subsolarLat={subsolarLat} showSunRays={showSunRays} />}
+        </group>
+        
         <Earth 
           showLabels={showLabels}
-          autoRotate={autoRotate}
           subsolarLat={subsolarLat}
-          showTerminator={showTerminator}
+          showDawnLine={showDawnLine}
+          showDuskLine={showDuskLine}
           showNoonLine={showNoonLine}
           showShading={showShading}
+          viewMode={viewMode}
+          rotationAngle={autoRotate ? rotationAngle : 0}
         />
       </Suspense>
       
@@ -925,8 +1028,10 @@ interface ControlPanelProps {
   setDayOfYear: (day: number) => void;
   initialDayOfYear: number;
   subsolarLat: number;
-  showTerminator: boolean;
-  setShowTerminator: (show: boolean) => void;
+  showDawnLine: boolean;
+  setShowDawnLine: (show: boolean) => void;
+  showDuskLine: boolean;
+  setShowDuskLine: (show: boolean) => void;
   showNoonLine: boolean;
   setShowNoonLine: (show: boolean) => void;
   showShading: boolean;
@@ -935,6 +1040,8 @@ interface ControlPanelProps {
   setShowSun: (show: boolean) => void;
   showSunRays: boolean;
   setShowSunRays: (show: boolean) => void;
+  viewMode: 'sun' | 'earth';
+  setViewMode: (mode: 'sun' | 'earth') => void;
 }
 
 function ControlPanel({
@@ -942,8 +1049,10 @@ function ControlPanel({
   setDayOfYear,
   initialDayOfYear,
   subsolarLat,
-  showTerminator,
-  setShowTerminator,
+  showDawnLine,
+  setShowDawnLine,
+  showDuskLine,
+  setShowDuskLine,
   showNoonLine,
   setShowNoonLine,
   showShading,
@@ -952,6 +1061,8 @@ function ControlPanel({
   setShowSun,
   showSunRays,
   setShowSunRays,
+  viewMode,
+  setViewMode,
 }: ControlPanelProps) {
 
   return (
@@ -962,6 +1073,47 @@ function ControlPanel({
       boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
     }}>
       <CardContent sx={{ p: 2 }}>
+        {/* 视角模式选择 */}
+        <div style={{ marginBottom: 16 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#8B5CF6', mb: 1 }}>
+            👁️ 观察视角
+          </Typography>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Chip
+              icon={<SunIcon sx={{ fontSize: 16 }} />}
+              label="太阳视角"
+              onClick={() => setViewMode('sun')}
+              sx={{
+                flex: 1,
+                background: viewMode === 'sun' 
+                  ? 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)' 
+                  : 'rgba(245, 158, 11, 0.1)',
+                color: viewMode === 'sun' ? 'white' : '#F59E0B',
+                fontWeight: viewMode === 'sun' ? 600 : 400,
+                '& .MuiChip-icon': { color: viewMode === 'sun' ? 'white' : '#F59E0B' },
+              }}
+            />
+            <Chip
+              icon={<span style={{ fontSize: 14 }}>🌍</span>}
+              label="地球视角"
+              onClick={() => setViewMode('earth')}
+              sx={{
+                flex: 1,
+                background: viewMode === 'earth' 
+                  ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)' 
+                  : 'rgba(59, 130, 246, 0.1)',
+                color: viewMode === 'earth' ? 'white' : '#3B82F6',
+                fontWeight: viewMode === 'earth' ? 600 : 400,
+              }}
+            />
+          </div>
+          <Typography variant="caption" sx={{ color: '#666', display: 'block', mt: 1, fontSize: '10px' }}>
+            {viewMode === 'sun' 
+              ? '☀️ 太阳固定，地球自转 → 观察地表如何依次经过晨线、正午线、昏线'
+              : '🌍 地球固定，太阳移动 → 观察某地一天中太阳位置的变化'}
+          </Typography>
+        </div>
+
         {/* 日期选择 */}
         <div style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -1018,11 +1170,17 @@ function ControlPanel({
           padding: 12,
           marginBottom: 16,
         }}>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            ☀️ 太阳直射点纬度
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+            ☀️ 太阳直射点位置
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#F59E0B' }}>
-            {formatDegreeMinute(subsolarLat)}
+          <div style={{ textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary">直射点纬度</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#F59E0B', lineHeight: 1.2 }}>
+              {formatDegreeMinute(subsolarLat)}
+            </Typography>
+          </div>
+          <Typography variant="caption" sx={{ color: '#666', display: 'block', mt: 1, fontSize: '10px' }}>
+            💡 正午线（红色虚线）上所有点的地方时都是 12:00，晨线上是 6:00，昏线上是 18:00
           </Typography>
         </div>
 
@@ -1033,12 +1191,21 @@ function ControlPanel({
           </Typography>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             <Chip
-              label="晨昏线"
+              label="🌅 晨线"
               size="small"
-              onClick={() => setShowTerminator(!showTerminator)}
+              onClick={() => setShowDawnLine(!showDawnLine)}
               sx={{
-                background: showTerminator ? COLORS.terminatorLine : 'rgba(0,0,0,0.05)',
-                color: showTerminator ? 'white' : 'text.secondary',
+                background: showDawnLine ? COLORS.dawnLine : 'rgba(0,0,0,0.05)',
+                color: showDawnLine ? 'white' : 'text.secondary',
+              }}
+            />
+            <Chip
+              label="🌆 昏线"
+              size="small"
+              onClick={() => setShowDuskLine(!showDuskLine)}
+              sx={{
+                background: showDuskLine ? COLORS.duskLine : 'rgba(0,0,0,0.05)',
+                color: showDuskLine ? 'white' : 'text.secondary',
               }}
             />
             <Chip
@@ -1101,24 +1268,28 @@ function ControlPanel({
               • <span style={{ color: '#8B5CF6' }}>昏线</span>：昼→夜的分界线（日落线）<br/>
               • 晨昏线是过地心的大圆，始终<b>垂直于太阳光线</b>
             </div>
-            
+
             <div style={{ marginBottom: 12, background: 'rgba(239, 68, 68, 0.08)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-              <b style={{ color: '#EF4444' }}>2. 地方时 ⭐⭐⭐（重点）</b><br/>
-              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
-                地方时由<b>经度</b>决定，同一经线地方时相同
-              </div>
-              • 太阳直射经线 = <b style={{ color: '#EF4444' }}>12:00</b>（正午）<br/>
-              • 直射点对面经线 = <b>0:00/24:00</b>（午夜）<br/>
-              • <span style={{ color: '#10B981' }}>晨线</span>与赤道交点 = <b style={{ color: '#10B981' }}>6:00</b><br/>
-              • <span style={{ color: '#8B5CF6' }}>昏线</span>与赤道交点 = <b style={{ color: '#8B5CF6' }}>18:00</b><br/>
-              <div style={{ fontSize: '11px', marginTop: '6px', padding: '4px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px' }}>
-                💡 <b>推导</b>：地球24h转360°，每小时转15°<br/>
-                晨线比正午线落后90°，即 90°÷15°/h = <b>6h</b>
-              </div>
+              <b style={{ color: '#EF4444' }}>2. 正午线与地方时 ⭐⭐⭐</b><br/>
+              • <span style={{ color: '#EF4444' }}>正午线</span>：太阳直射的<b>经线</b>，地方时 <b>12:00</b><br/>
+              • 午夜线：正午线对面180°，地方时 <b>0:00</b><br/>
+              • <span style={{ color: '#10B981' }}>晨线</span>：地方时 <b>6:00</b>（比正午线西90°）<br/>
+              • <span style={{ color: '#8B5CF6' }}>昏线</span>：地方时 <b>18:00</b>（比正午线东90°）<br/>
             </div>
 
+            <div style={{ marginBottom: 12, background: 'rgba(139, 92, 246, 0.08)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+              <b style={{ color: '#8B5CF6' }}>3. 两种观察视角 👁️</b><br/>
+              • <b>☀️ 太阳视角</b>：太阳固定，地球自转<br/>
+              　→ 晨线、昏线、正午线<b>固定不动</b><br/>
+              　→ 观察地表如何依次经过晨线→正午线→昏线<br/>
+              • <b>🌍 地球视角</b>：地球固定，太阳移动<br/>
+              　→ 晨线、昏线、正午线<b>绕地球转动</b><br/>
+              　→ 观察某地一天中太阳位置的变化
+            </div>
+            
             <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#06B6D4' }}>3. 地方时计算 ⭐⭐⭐</b><br/>
+              <b style={{ color: '#06B6D4' }}>4. 地方时计算 ⭐⭐⭐</b><br/>
+              • 地方时由<b>经度</b>决定，同一经线地方时相同<br/>
               • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
               • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
               • <b>东加西减</b>：东边时间早，西边时间晚<br/>
@@ -1128,7 +1299,7 @@ function ControlPanel({
             </div>
             
             <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#3B82F6' }}>4. 太阳直射点移动 ⭐⭐</b><br/>
+              <b style={{ color: '#3B82F6' }}>5. 太阳直射点移动 ⭐⭐</b><br/>
               • 春分→夏至：向<b>北</b>移<br/>
               • 夏至→秋分：向<b>南</b>移<br/>
               • 秋分→冬至：向<b>南</b>移<br/>
@@ -1136,7 +1307,7 @@ function ControlPanel({
             </div>
             
             <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#10B981' }}>5. 昼夜长短规律 ⭐⭐⭐</b><br/>
+              <b style={{ color: '#10B981' }}>6. 昼夜长短规律 ⭐⭐⭐</b><br/>
               • 直射点所在半球：<b>昼长夜短</b><br/>
               • 纬度越高变化越大<br/>
               • 赤道终年昼夜平分（12小时）<br/>
@@ -1144,7 +1315,7 @@ function ControlPanel({
             </div>
             
             <div>
-              <b style={{ color: '#8B5CF6' }}>6. 特殊日期 ⭐⭐</b><br/>
+              <b style={{ color: '#F59E0B' }}>7. 特殊日期 ⭐⭐</b><br/>
               • 春/秋分：全球昼夜平分，晨昏线过两极<br/>
               • 夏至：北半球昼最长，北极圈内极昼<br/>
               • 冬至：北半球夜最长，北极圈内极夜
@@ -1297,11 +1468,13 @@ export default function DayNightDemo3D({
   const [autoRotate, setAutoRotate] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
   const [dayOfYear, setDayOfYear] = useState(initialDayOfYear);
-  const [showTerminator, setShowTerminator] = useState(true);
+  const [showDawnLine, setShowDawnLine] = useState(true);
+  const [showDuskLine, setShowDuskLine] = useState(true);
   const [showNoonLine, setShowNoonLine] = useState(true);
   const [showShading, setShowShading] = useState(true);
   const [showSun, setShowSun] = useState(true);
   const [showSunRays, setShowSunRays] = useState(true);
+  const [viewMode, setViewMode] = useState<'sun' | 'earth'>('sun');
   
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
 
@@ -1320,15 +1493,15 @@ export default function DayNightDemo3D({
         • <span style={{color: '#10B981'}}>晨线</span>：由夜半球进入昼半球的界线（日出线）<br/>
         • <span style={{color: '#8B5CF6'}}>昏线</span>：由昼半球进入夜半球的界线（日落线）<br/><br/>
         
-        <b>2. 地方时 ⭐⭐⭐（核心）</b><br/>
-        • 地方时由<b>经度</b>决定，同一经线上地方时相同<br/>
-        • <span style={{color: '#EF4444'}}>太阳直射经线 = <b>12:00</b>（正午）</span><br/>
-        • 直射点对面经线 = <b>0:00/24:00</b>（午夜）<br/>
-        • <span style={{color: '#10B981'}}>晨线与赤道交点 = <b>6:00</b></span><br/>
-        • <span style={{color: '#8B5CF6'}}>昏线与赤道交点 = <b>18:00</b></span><br/>
-        • 💡 推导：地球24h转360°，每小时15°；晨线比正午线落后90°= 6小时<br/><br/>
+        <b>2. 正午线与地方时 ⭐⭐⭐（核心）</b><br/>
+        • <span style={{color: '#EF4444'}}>正午线</span>：太阳直射的<b>经线</b>，地方时 = <b>12:00</b><br/>
+        • 午夜线：正午线对面180°，地方时 = <b>0:00</b><br/>
+        • <span style={{color: '#10B981'}}>晨线</span>：地方时 = <b>6:00</b>（比正午线西90°）<br/>
+        • <span style={{color: '#8B5CF6'}}>昏线</span>：地方时 = <b>18:00</b>（比正午线东90°）<br/>
+        • 💡 这三条线相对太阳固定，地球自转时地表经线依次经过它们<br/><br/>
         
         <b>3. 地方时计算 ⭐⭐⭐</b><br/>
+        • 地方时由<b>经度</b>决定，同一经线上地方时相同<br/>
         • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
         • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
         • <b>东加西减</b>：东边时间早，西边时间晚<br/>
@@ -1362,11 +1535,13 @@ export default function DayNightDemo3D({
               showLabels={showLabels}
               autoRotate={autoRotate}
               subsolarLat={subsolarLat}
-              showTerminator={showTerminator}
+              showDawnLine={showDawnLine}
+              showDuskLine={showDuskLine}
               showNoonLine={showNoonLine}
               showShading={showShading}
               showSun={showSun}
               showSunRays={showSunRays}
+              viewMode={viewMode}
               cameraRef={cameraControllerRef}
             />
           </Canvas>
@@ -1383,12 +1558,16 @@ export default function DayNightDemo3D({
           setDayOfYear={setDayOfYear}
           initialDayOfYear={initialDayOfYear}
           subsolarLat={subsolarLat}
-          showTerminator={showTerminator}
-          setShowTerminator={setShowTerminator}
+          showDawnLine={showDawnLine}
+          setShowDawnLine={setShowDawnLine}
+          showDuskLine={showDuskLine}
+          setShowDuskLine={setShowDuskLine}
           showNoonLine={showNoonLine}
           setShowNoonLine={setShowNoonLine}
           showShading={showShading}
           setShowShading={setShowShading}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
           showSun={showSun}
           setShowSun={setShowSun}
           showSunRays={showSunRays}

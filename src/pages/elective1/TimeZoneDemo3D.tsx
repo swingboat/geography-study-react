@@ -49,6 +49,7 @@ import {
   AnimationPageLayout,
   SceneLoading,
   type CameraControllerHandle,
+  type InfoCard,
 } from '../../shared/components';
 
 // ===================== 类型定义 =====================
@@ -1239,38 +1240,61 @@ export default function TimeZoneDemo3D({
   }, []);
 
   // 知识点信息内容
-  const infoContent = (
-    <>
-      <Typography variant="h6" gutterBottom sx={{ color: '#6366F1' }}>
-        📚 时区与时差（高考重点）
-      </Typography>
-      <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
-        <b>1. 地方时计算 ⭐⭐⭐</b><br/>
-        • 经度每差15° → 时差1小时<br/>
-        • 经度每差1° → 时差4分钟<br/>
-        • <span style={{color: '#EF4444'}}>公式：所求地方时 = 已知地方时 ± 经度差×4分钟</span><br/>
-        • 东加西减：往东时间早，往西时间晚<br/><br/>
-        
-        <b>2. 区时计算 ⭐⭐⭐</b><br/>
-        • 时区划分：全球24个时区，每15°为一个时区<br/>
-        • <span style={{color: '#EF4444'}}>中央经线 = 时区数 × 15°</span><br/>
-        • <span style={{color: '#3B82F6'}}>北京时间 = 东八区区时（120°E）</span><br/>
-        • 公式：所求区时 = 已知区时 ± 时区差<br/><br/>
-        
-        <b>3. 日期变更 ⭐⭐</b><br/>
-        • <span style={{color: '#8B5CF6'}}>国际日界线</span>：大致沿180°经线<br/>
-        • <span style={{color: '#10B981'}}>自然日界线</span>：0时/24时所在经线<br/>
-        • 向东过国际日界线：日期<b>减</b>一天<br/>
-        • 向西过国际日界线：日期<b>加</b>一天<br/>
-        • 全球日期分布：两条日界线将地球分成"今天"和"昨天"<br/><br/>
-        
-        <b>4. 东西半球划分 ⭐</b><br/>
-        • 东半球：20°W → 0° → 160°E<br/>
-        • 西半球：160°E → 180° → 20°W<br/>
-        • <span style={{color: '#EF4444'}}>注意：不是以0°和180°划分！</span>
-      </Typography>
-    </>
-  );
+  const infoContent: InfoCard[] = [
+    {
+      title: '地方时计算',
+      icon: '⏱️',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          • 经度每差<b>15°</b> → 时差<b>1小时</b><br/>
+          • 经度每差<b>1°</b> → 时差<b>4分钟</b><br/><br/>
+          <span style={{color: '#EF4444', fontWeight: 'bold'}}>公式：所求地方时 = 已知地方时 ± 经度差×4分钟</span><br/><br/>
+          <b>东加西减</b>：往东时间早，往西时间晚
+        </Typography>
+      ),
+      stars: 3
+    },
+    {
+      title: '区时计算',
+      icon: '🌐',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          • 时区划分：全球<b>24个时区</b>，每15°为一个时区<br/><br/>
+          <span style={{color: '#EF4444'}}>中央经线 = 时区数 × 15°</span><br/><br/>
+          <span style={{color: '#3B82F6', fontWeight: 'bold'}}>北京时间 = 东八区区时（120°E）</span><br/><br/>
+          公式：所求区时 = 已知区时 ± 时区差
+        </Typography>
+      ),
+      stars: 3
+    },
+    {
+      title: '日期变更',
+      icon: '📅',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          <span style={{color: '#8B5CF6'}}>• 国际日界线</span>：大致沿180°经线<br/>
+          <span style={{color: '#10B981'}}>• 自然日界线</span>：0时/24时所在经线<br/><br/>
+          • 向<b>东</b>过国际日界线：日期<span style={{color: '#EF4444'}}>减</span>一天<br/>
+          • 向<b>西</b>过国际日界线：日期<span style={{color: '#10B981'}}>加</span>一天<br/><br/>
+          两条日界线将地球分成"今天"和"昨天"
+        </Typography>
+      ),
+      stars: 2
+    },
+    {
+      title: '东西半球划分',
+      icon: '🌍',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          • <span style={{color: '#3B82F6'}}>东半球</span>：20°W → 0° → 160°E<br/>
+          • <span style={{color: '#EF4444'}}>西半球</span>：160°E → 180° → 20°W<br/><br/>
+          <span style={{color: '#EF4444', fontWeight: 'bold'}}>⚠️ 注意：不是以0°和180°划分！</span><br/><br/>
+          这样划分是为了避免欧洲和非洲被分割到两个半球。
+        </Typography>
+      ),
+      stars: 1
+    }
+  ];
 
   return (
     <AnimationPageLayout

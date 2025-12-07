@@ -54,6 +54,7 @@ import {
   AnimationPageLayout,
   SceneLoading,
   type CameraControllerHandle,
+  type InfoCard,
 } from '../../shared/components';
 
 // ===================== 类型定义 =====================
@@ -1502,30 +1503,71 @@ export default function LongitudeDemo3D({
   }, [allCities, customCities, handleCityClick]);
 
   // 知识点信息内容
-  const infoContent = (
-    <>
-      <Typography variant="h6" gutterBottom sx={{ color: '#3B82F6' }}>
-        📚 经度知识点
-      </Typography>
-      <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
-        <b>1. 经度定义</b><br/>
-        经度是地球上某点与本初子午线（0°经线）之间的角度距离。<br/><br/>
-        
-        <b>2. 本初子午线</b><br/>
-        经过英国伦敦格林尼治天文台的经线，被定义为0°经线。<br/><br/>
-        
-        <b>3. 东经与西经</b><br/>
-        • 东经(E)：本初子午线以东，0°~180°<br/>
-        • 西经(W)：本初子午线以西，0°~180°<br/><br/>
-        
-        <b>4. 国际日期变更线</b><br/>
-        大致沿180°经线，跨越此线日期加减一天。<br/><br/>
-        
-        <b>5. 经度与时区</b><br/>
-        地球自转一周360°需24小时，每15°经度对应1小时时差。
-      </Typography>
-    </>
-  );
+  const infoContent: InfoCard[] = [
+    {
+      title: '经度定义',
+      icon: '📐',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          经度是地球上某点与本初子午线（0°经线）之间的<b>角度距离</b>。
+          <br/><br/>
+          经线是连接南北两极的半圆弧，所有经线长度相等，约等于<b>20000公里</b>。
+        </Typography>
+      ),
+      stars: 2
+    },
+    {
+      title: '本初子午线',
+      icon: '🏛️',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          经过英国伦敦<b>格林尼治天文台</b>的经线，被定义为<span style={{color: '#3B82F6'}}>0°经线</span>。
+          <br/><br/>
+          1884年国际子午线会议上确定，作为全球经度和时间的基准。
+        </Typography>
+      ),
+      stars: 2
+    },
+    {
+      title: '东经与西经',
+      icon: '🧭',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          • <span style={{color: '#10B981'}}>东经(E)</span>：本初子午线以东，0°~180°<br/>
+          • <span style={{color: '#EF4444'}}>西经(W)</span>：本初子午线以西，0°~180°<br/><br/>
+          180°E和180°W是同一条经线。
+        </Typography>
+      ),
+      stars: 3
+    },
+    {
+      title: '国际日期变更线',
+      icon: '📅',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          大致沿<span style={{color: '#8B5CF6'}}>180°经线</span>，但为避免穿过陆地有所弯曲。
+          <br/><br/>
+          • 向<b>东</b>跨越：日期<span style={{color: '#EF4444'}}>减</span>一天<br/>
+          • 向<b>西</b>跨越：日期<span style={{color: '#10B981'}}>加</span>一天
+        </Typography>
+      ),
+      stars: 3
+    },
+    {
+      title: '经度与时区',
+      icon: '⏰',
+      content: (
+        <Typography variant="body2" sx={{ lineHeight: 2 }}>
+          地球自转一周<b>360°</b>需<b>24小时</b>。
+          <br/><br/>
+          • 每<span style={{color: '#3B82F6'}}>15°</span>经度对应<span style={{color: '#EF4444'}}>1小时</span>时差<br/>
+          • 每<span style={{color: '#3B82F6'}}>1°</span>经度对应<span style={{color: '#EF4444'}}>4分钟</span>时差<br/><br/>
+          全球划分为<b>24个时区</b>。
+        </Typography>
+      ),
+      stars: 3
+    }
+  ];
 
   return (
     <AnimationPageLayout

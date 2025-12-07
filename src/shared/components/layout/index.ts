@@ -3,4 +3,5 @@ export {
   SceneLoading, 
   useAnimationPageLayout,
   type AnimationPageLayoutProps,
+  type InfoCard,
 } from './AnimationPageLayout';

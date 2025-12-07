@@ -59,6 +59,7 @@ import {
 
 interface DayNightDemo3DProps {
   initialDate?: Date;
+  onBack?: () => void;
 }
 
 // ===================== 常量 =====================
@@ -209,7 +210,7 @@ function Sun3D({ subsolarLat, showSunRays }: { subsolarLat: number; showSunRays:
         <pointLight color={COLORS.sun} intensity={2} distance={20} />
         
         {/* 太阳标签 */}
-        <Html position={[0, 1, 0]} center>
+        <Html position={[0, 1, 0]} center zIndexRange={[100, 0]}>
           <div style={{
             background: 'rgba(251, 191, 36, 0.9)',
             color: 'white',
@@ -396,7 +397,7 @@ function TerminatorLine({
       {/* 晨线标签 */}
       {showLabels && showDawn && dawnVisible && (
         <group position={dawnPosition}>
-          <Html center>
+          <Html center zIndexRange={[100, 0]}>
             <div style={{
               background: 'rgba(16, 185, 129, 0.9)',
               color: 'white',
@@ -415,7 +416,7 @@ function TerminatorLine({
       {/* 昏线标签 */}
       {showLabels && showDusk && duskVisible && (
         <group position={duskPosition}>
-          <Html center>
+          <Html center zIndexRange={[100, 0]}>
             <div style={{
               background: 'rgba(139, 92, 246, 0.9)',
               color: 'white',
@@ -512,7 +513,7 @@ function NoonLine({
       {/* 太阳直射点标签 */}
       {showLabel && isVisible && (
         <group position={subsolarLabelPosition}>
-          <Html center>
+          <Html center zIndexRange={[100, 0]}>
             <div style={{
               background: 'rgba(239, 68, 68, 0.9)',
               color: 'white',
@@ -1457,6 +1458,7 @@ function MobileControlPanel({
 
 export default function DayNightDemo3D({
   initialDate = new Date(),
+  onBack,
 }: DayNightDemo3DProps) {
   // 计算初始的年中第几天
   const initialDayOfYear = useMemo(() => {
@@ -1481,53 +1483,106 @@ export default function DayNightDemo3D({
   // 计算太阳直射点纬度
   const subsolarLat = useMemo(() => getSubsolarLatitude(dayOfYear), [dayOfYear]);
 
-  // 知识点信息内容
-  const infoContent = (
-    <>
-      <Typography variant="h6" gutterBottom sx={{ color: '#F59E0B' }}>
-        📚 昼夜与晨昏线（高考重点）
-      </Typography>
-      <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
-        <b>1. 晨昏线 ⭐⭐⭐</b><br/>
-        • 晨昏线是昼夜半球的分界线，始终<b>垂直于太阳光线</b><br/>
-        • <span style={{color: '#10B981'}}>晨线</span>：由夜半球进入昼半球的界线（日出线）<br/>
-        • <span style={{color: '#8B5CF6'}}>昏线</span>：由昼半球进入夜半球的界线（日落线）<br/><br/>
-        
-        <b>2. 正午线与地方时 ⭐⭐⭐（核心）</b><br/>
-        • <span style={{color: '#EF4444'}}>正午线</span>：太阳直射的<b>经线</b>，地方时 = <b>12:00</b><br/>
-        • 午夜线：正午线对面180°，地方时 = <b>0:00</b><br/>
-        • <span style={{color: '#10B981'}}>晨线</span>：地方时 = <b>6:00</b>（比正午线西90°）<br/>
-        • <span style={{color: '#8B5CF6'}}>昏线</span>：地方时 = <b>18:00</b>（比正午线东90°）<br/>
-        • 💡 这三条线相对太阳固定，地球自转时地表经线依次经过它们<br/><br/>
-        
-        <b>3. 地方时计算 ⭐⭐⭐</b><br/>
-        • 地方时由<b>经度</b>决定，同一经线上地方时相同<br/>
-        • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
-        • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
-        • <b>东加西减</b>：东边时间早，西边时间晚<br/>
-        • 公式：所求地方时 = 已知地方时 ± 经度差×4分钟<br/><br/>
-        
-        <b>4. 太阳直射点移动 ⭐⭐</b><br/>
-        • 春分(3/21)→夏至(6/22)：向北移动<br/>
-        • 夏至(6/22)→秋分(9/23)：向南移动<br/>
-        • 秋分(9/23)→冬至(12/22)：向南移动<br/>
-        • 冬至(12/22)→春分(3/21)：向北移动<br/><br/>
-        
-        <b>5. 昼夜长短变化 ⭐⭐⭐</b><br/>
-        • 太阳直射点在哪个半球，该半球昼长夜短<br/>
-        • 纬度越高，昼夜长短变化越大<br/>
-        • 赤道上全年昼夜平分（12小时）<br/>
-        • 极圈内有极昼极夜现象<br/><br/>
-        
-        <b>6. 特殊纬度 ⭐</b><br/>
-        • 回归线（23°26′）：太阳直射的最北/南界限<br/>
-        • 极圈（66°34′）：极昼极夜的最低纬度
-      </Typography>
-    </>
-  );
+  // 知识点信息内容 - 使用卡片数组格式
+  const infoContent = [
+    {
+      title: '晨昏线',
+      icon: '🌓',
+      stars: 3,
+      content: (
+        <>
+          • 晨昏线是昼夜半球的分界线，始终<b>垂直于太阳光线</b><br/><br/>
+          • <span style={{color: '#10B981'}}>晨线</span>：由夜半球进入昼半球的界线（日出线）<br/><br/>
+          • <span style={{color: '#8B5CF6'}}>昏线</span>：由昼半球进入夜半球的界线（日落线）<br/><br/>
+          💡 晨昏线始终平分地球，是一个过地心的大圆
+        </>
+      ),
+    },
+    {
+      title: '正午线与地方时',
+      icon: '🕐',
+      stars: 3,
+      content: (
+        <>
+          <b>核心知识点：</b><br/><br/>
+          • <span style={{color: '#EF4444'}}>正午线</span>：太阳直射的<b>经线</b>，地方时 = <b>12:00</b><br/><br/>
+          • 午夜线：正午线对面180°，地方时 = <b>0:00</b><br/><br/>
+          • <span style={{color: '#10B981'}}>晨线</span>：地方时 = <b>6:00</b>（比正午线西90°）<br/><br/>
+          • <span style={{color: '#8B5CF6'}}>昏线</span>：地方时 = <b>18:00</b>（比正午线东90°）<br/><br/>
+          💡 这三条线相对太阳固定，地球自转时地表经线依次经过它们
+        </>
+      ),
+    },
+    {
+      title: '地方时计算',
+      icon: '🧮',
+      stars: 3,
+      content: (
+        <>
+          <b>计算规则：</b><br/><br/>
+          • 地方时由<b>经度</b>决定，同一经线上地方时相同<br/><br/>
+          • 经度每差<b>15°</b>，时间差<b>1小时</b><br/><br/>
+          • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/><br/>
+          • <b>东加西减</b>：东边时间早，西边时间晚<br/><br/>
+          <b>公式：</b><br/>
+          所求地方时 = 已知地方时 ± 经度差×4分钟
+        </>
+      ),
+    },
+    {
+      title: '太阳直射点移动',
+      icon: '☀️',
+      stars: 2,
+      content: (
+        <>
+          <b>全年移动规律：</b><br/><br/>
+          • 春分(3/21)→夏至(6/22)：<b>向北</b>移动<br/><br/>
+          • 夏至(6/22)→秋分(9/23)：<b>向南</b>移动<br/><br/>
+          • 秋分(9/23)→冬至(12/22)：<b>向南</b>移动<br/><br/>
+          • 冬至(12/22)→春分(3/21)：<b>向北</b>移动<br/><br/>
+          💡 直射点在南北回归线之间往返移动
+        </>
+      ),
+    },
+    {
+      title: '昼夜长短变化',
+      icon: '🌗',
+      stars: 3,
+      content: (
+        <>
+          <b>变化规律：</b><br/><br/>
+          • 太阳直射点在哪个半球，该半球<b>昼长夜短</b><br/><br/>
+          • 纬度越高，昼夜长短变化越大<br/><br/>
+          • <b>赤道</b>上全年昼夜平分（12小时）<br/><br/>
+          • <b>极圈内</b>有极昼极夜现象<br/><br/>
+          💡 夏至日北半球白昼最长，冬至日白昼最短
+        </>
+      ),
+    },
+    {
+      title: '特殊纬度',
+      icon: '🌐',
+      stars: 1,
+      content: (
+        <>
+          <b>回归线（23°26′）：</b><br/>
+          太阳直射的最北/最南界限<br/><br/>
+          <b>极圈（66°34′）：</b><br/>
+          极昼极夜的最低纬度<br/><br/>
+          <b>记忆技巧：</b><br/>
+          回归线 + 极圈 = 90°<br/>
+          23°26′ + 66°34′ = 90°
+        </>
+      ),
+    },
+  ];
 
   return (
     <AnimationPageLayout
+      onBack={onBack}
+      pageTitle="昼夜与晨昏线"
+      backButtonColor="#F59E0B"
+      infoAccentColor="#F59E0B"
       scene3D={
         <Suspense fallback={<SceneLoading />}>
           <Canvas camera={{ position: [14, 5, 10], fov: 50 }} style={{ width: '100%', height: '100%' }}>

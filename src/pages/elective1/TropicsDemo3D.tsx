@@ -61,6 +61,7 @@ import {
 
 interface TropicsDemo3DProps {
   initialObliquity?: number;
+  onBack?: () => void;
 }
 
 // ===================== 本地常量（特定于此组件） =====================
@@ -343,7 +344,7 @@ function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthPr
 
       {/* N极标签 */}
       {showLabels && (
-        <Html position={[0, axisLength + 0.3, 0]} center>
+        <Html position={[0, axisLength + 0.3, 0]} center zIndexRange={[100, 0]}>
           <div style={{ color: COLORS.axis, fontSize: '12px', fontWeight: 'bold' }}>N</div>
         </Html>
       )}
@@ -359,7 +360,7 @@ function RotationIndicator({ showLabels }: { showLabels: boolean }) {
   if (!showLabels) return null;
   
   return (
-    <Html position={[2.5, 1.5, 0]} center>
+    <Html position={[2.5, 1.5, 0]} center zIndexRange={[100, 0]}>
       <div style={{
         color: '#60A5FA',
         fontSize: '10px',
@@ -522,7 +523,7 @@ function TwoDView({ sunLatitude }: { sunLatitude: number }) {
 
 // ===================== 主组件 =====================
 
-export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
+export default function TropicsDemo3D({ onBack }: TropicsDemo3DProps) {
   const [currentSeason, setCurrentSeason] = useState<SeasonType>('winter');
   const [sunLatitude, setSunLatitude] = useState(SEASONS.winter.sunLatitude);
   const [orbitProgress, setOrbitProgress] = useState(0); // 0-1，表示公转进度，0=冬至
@@ -1098,6 +1099,9 @@ export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
 
   return (
     <AnimationPageLayout
+      onBack={onBack}
+      pageTitle="南北回归线"
+      backButtonColor="#EF4444"
       scene3D={scene3D}
       scene2D={scene2D}
       controlPanel={controlPanel}

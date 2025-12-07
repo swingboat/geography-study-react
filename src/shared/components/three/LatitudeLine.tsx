@@ -63,7 +63,7 @@ function LatitudeLabel({
   });
 
   return (
-    <Html position={labelRef.position} center>
+    <Html position={labelRef.position} center zIndexRange={[100, 0]}>
       <div style={{
         color: color,
         fontSize: '11px',

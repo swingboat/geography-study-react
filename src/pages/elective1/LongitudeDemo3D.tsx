@@ -60,6 +60,7 @@ import {
 
 interface LongitudeDemo3DProps {
   initialLongitude?: number;
+  onBack?: () => void;
 }
 
 // ===================== 常量 =====================
@@ -195,7 +196,7 @@ function MeridianLabel({
 
   return (
     <group ref={groupRef} position={position}>
-      <Html center>
+      <Html center zIndexRange={[100, 0]}>
         <div style={{
           color: '#FFFFFF',
           fontSize: '11px',
@@ -353,7 +354,7 @@ function CityMarker({
       </mesh>
       
       {/* 城市标签 */}
-      <Html position={[0, 0.2, 0]} center occlude={false}>
+      <Html position={[0, 0.2, 0]} center occlude={false} zIndexRange={[100, 0]}>
         <div 
           onClick={onClick}
           style={{
@@ -657,10 +658,10 @@ function Earth({
       {/* 标签 */}
       {showLabels && (
         <>
-          <Html position={[0, 2.5, 0]} center>
+          <Html position={[0, 2.5, 0]} center zIndexRange={[100, 0]}>
             <div style={{ color: COLORS.axis, fontSize: '11px', fontWeight: 'bold' }}>N</div>
           </Html>
-          <Html position={[0, -2.5, 0]} center>
+          <Html position={[0, -2.5, 0]} center zIndexRange={[100, 0]}>
             <div style={{ color: COLORS.axis, fontSize: '11px', fontWeight: 'bold' }}>S</div>
           </Html>
         </>
@@ -1409,6 +1410,7 @@ function MobileControlPanel({
 
 export default function LongitudeDemo3D({
   initialLongitude = 116.4, // 默认北京经度
+  onBack,
 }: LongitudeDemo3DProps) {
   const [selectedLongitude, setSelectedLongitude] = useState(initialLongitude);
   const [autoRotate, setAutoRotate] = useState(false);
@@ -1527,6 +1529,9 @@ export default function LongitudeDemo3D({
 
   return (
     <AnimationPageLayout
+      onBack={onBack}
+      pageTitle="经度"
+      backButtonColor="#10B981"
       scene3D={
         <Suspense fallback={<SceneLoading />}>
           <Canvas camera={{ position: [8, 2, 0], fov: 50 }} style={{ width: '100%', height: '100%' }}>

@@ -57,6 +57,7 @@ export function SeasonMarkers({
             -Math.sin(marker.angle) * (radius + labelOffset),
           ]} 
           center
+          zIndexRange={[100, 0]}
         >
           <div style={{ 
             color: marker.color, 

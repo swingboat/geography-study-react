@@ -8,14 +8,12 @@ import {
   CardActionArea,
   Breadcrumbs,
   Chip,
-  IconButton,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
 import {
   Home as HomeIcon,
   NavigateNext as NavigateNextIcon,
-  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
 import TropicsDemo3D from './pages/elective1/TropicsDemo3D';
@@ -333,32 +331,6 @@ function ObliquityPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
-      {/* 移动端固定返回按钮 */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-          }}
-        >
-          <IconButton
-            onClick={() => navigate('/')}
-            sx={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
-              color: 'white',
-              boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #5558E3 0%, #9747E8 100%)',
-              },
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </div>
-      )}
-
       <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
@@ -387,7 +359,7 @@ function ObliquityPage() {
           </motion.div>
         )}
         
-        <ObliquityOfEclipticDemo3D />
+        <ObliquityOfEclipticDemo3D onBack={() => navigate('/')} />
       </Container>
     </div>
   );
@@ -401,32 +373,6 @@ function TropicsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
-      {/* 移动端固定返回按钮 */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-          }}
-        >
-          <IconButton
-            onClick={() => navigate('/')}
-            sx={{
-              background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
-              color: 'white',
-              boxShadow: '0 4px 15px rgba(239, 68, 68, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #DC2626 0%, #EA580C 100%)',
-              },
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </div>
-      )}
-
       <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
@@ -455,7 +401,7 @@ function TropicsPage() {
           </motion.div>
         )}
         
-        <TropicsDemo3D />
+        <TropicsDemo3D onBack={() => navigate('/')} />
       </Container>
     </div>
   );
@@ -469,32 +415,6 @@ function LongitudePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      {/* 移动端固定返回按钮 */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-          }}
-        >
-          <IconButton
-            onClick={() => navigate('/')}
-            sx={{
-              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-              color: 'white',
-              boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-              },
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </div>
-      )}
-
       <Container maxWidth={false} sx={{ px: isMobile ? 0 : 3, maxWidth: '100%' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
@@ -523,7 +443,7 @@ function LongitudePage() {
           </motion.div>
         )}
         
-        <LongitudeDemo3D />
+        <LongitudeDemo3D onBack={() => navigate('/')} />
       </Container>
     </div>
   );
@@ -537,32 +457,6 @@ function TimeZonePage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      {/* 移动端固定返回按钮 */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-          }}
-        >
-          <IconButton
-            onClick={() => navigate('/')}
-            sx={{
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
-              color: 'white',
-              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
-              },
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </div>
-      )}
-
       <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
@@ -591,7 +485,7 @@ function TimeZonePage() {
           </motion.div>
         )}
         
-        <TimeZoneDemo3D />
+        <TimeZoneDemo3D onBack={() => navigate('/')} />
       </Container>
     </div>
   );
@@ -605,32 +499,6 @@ function DayNightPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      {/* 移动端固定返回按钮 */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 16,
-            left: 16,
-            zIndex: 1001,
-          }}
-        >
-          <IconButton
-            onClick={() => navigate('/')}
-            sx={{
-              background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
-              color: 'white',
-              boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-              },
-            }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        </div>
-      )}
-
       <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
@@ -659,7 +527,7 @@ function DayNightPage() {
           </motion.div>
         )}
         
-        <DayNightDemo3D />
+        <DayNightDemo3D onBack={() => navigate('/')} />
       </Container>
     </div>
   );

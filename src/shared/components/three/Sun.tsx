@@ -66,7 +66,7 @@ export function Sun({
       
       {/* 太阳标签 */}
       {showLabel && (
-        <Html position={[0, -(radius + 1.3), 0]} center>
+        <Html position={[0, -(radius + 1.3), 0]} center zIndexRange={[100, 0]}>
           <div style={{ 
             color: ASTRONOMY_COLORS.sun, 
             fontSize: '14px', 

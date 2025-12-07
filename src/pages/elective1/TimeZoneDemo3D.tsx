@@ -55,6 +55,7 @@ import {
 
 interface TimeZoneDemo3DProps {
   initialLongitude?: number;
+  onBack?: () => void;
 }
 
 // ===================== 常量 =====================
@@ -205,7 +206,7 @@ function TimeZoneLabel({
 
   return (
     <group ref={groupRef} position={position}>
-      <Html center>
+      <Html center zIndexRange={[100, 0]}>
         <div style={{
           background: 'rgba(99, 102, 241, 0.9)',
           color: 'white',
@@ -264,7 +265,7 @@ function MeridianLabel({
 
   return (
     <group ref={groupRef} position={position}>
-      <Html center>
+      <Html center zIndexRange={[100, 0]}>
         <div style={{
           background: color,
           color: 'white',
@@ -292,7 +293,7 @@ function HemisphereDividers({ showLabels }: { showLabels: boolean }) {
       {showLabels && (
         <>
           <group position={[Math.cos((-20 * Math.PI) / 180) * 2.4, 1.5, -Math.sin((-20 * Math.PI) / 180) * 2.4]}>
-            <Html center>
+            <Html center zIndexRange={[100, 0]}>
               <div style={{
                 background: 'rgba(245, 158, 11, 0.9)',
                 color: 'white',
@@ -306,7 +307,7 @@ function HemisphereDividers({ showLabels }: { showLabels: boolean }) {
             </Html>
           </group>
           <group position={[Math.cos((160 * Math.PI) / 180) * 2.4, 1.5, -Math.sin((160 * Math.PI) / 180) * 2.4]}>
-            <Html center>
+            <Html center zIndexRange={[100, 0]}>
               <div style={{
                 background: 'rgba(59, 130, 246, 0.9)',
                 color: 'white',
@@ -390,7 +391,7 @@ function CityMarker({
         <meshBasicMaterial color={isSelected ? COLORS.selectedZone : '#FFFFFF'} />
       </mesh>
       
-      <Html position={[0, 0.2, 0]} center occlude={false}>
+      <Html position={[0, 0.2, 0]} center occlude={false} zIndexRange={[100, 0]}>
         <div 
           onClick={(e) => { e.stopPropagation(); onClick(); }}
           style={{
@@ -1211,6 +1212,7 @@ function MobileControlPanel({
 
 export default function TimeZoneDemo3D({
   initialLongitude = 116.4,
+  onBack,
 }: TimeZoneDemo3DProps) {
   const [autoRotate, setAutoRotate] = useState(false);
   const [showLabels, setShowLabels] = useState(true);
@@ -1272,6 +1274,9 @@ export default function TimeZoneDemo3D({
 
   return (
     <AnimationPageLayout
+      onBack={onBack}
+      pageTitle="时区与时差"
+      backButtonColor="#8B5CF6"
       scene3D={
         <Suspense fallback={<SceneLoading />}>
           <Canvas camera={{ position: [8, 2, 0], fov: 50 }} style={{ width: '100%', height: '100%' }}>

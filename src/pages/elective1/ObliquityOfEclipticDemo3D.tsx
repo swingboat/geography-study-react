@@ -52,6 +52,7 @@ interface ObliquityDemo3DProps {
   initialObliquity?: number;
   minObliquity?: number;
   maxObliquity?: number;
+  onBack?: () => void;
 }
 
 // ===================== 本地常量 =====================
@@ -209,22 +210,22 @@ function Earth({ position, obliquity, showLabels }: EarthProps) {
       {/* 标签 */}
       {showLabels && (
         <>
-          <Html position={[2.2, 0, 0]} center>
+          <Html position={[2.2, 0, 0]} center zIndexRange={[100, 0]}>
             <div style={{ color: COLORS.eclipticPlane, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
               黄道面
             </div>
           </Html>
-          <Html position={[2.2 * Math.cos(obliquityRad), 2.2 * Math.sin(obliquityRad), 0]} center>
+          <Html position={[2.2 * Math.cos(obliquityRad), 2.2 * Math.sin(obliquityRad), 0]} center zIndexRange={[100, 0]}>
             <div style={{ color: COLORS.equatorPlane, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
               赤道面
             </div>
           </Html>
-          <Html position={[axisTop.x + 0.3, axisTop.y + 0.3, 0]} center>
+          <Html position={[axisTop.x + 0.3, axisTop.y + 0.3, 0]} center zIndexRange={[100, 0]}>
             <div style={{ color: COLORS.axis, fontSize: '12px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
               N极
             </div>
           </Html>
-          <Html position={[1.3, -0.8, 0]} center>
+          <Html position={[1.3, -0.8, 0]} center zIndexRange={[100, 0]}>
             <div style={{ 
               color: COLORS.angleArc, 
               fontSize: '14px', 
@@ -429,6 +430,7 @@ export default function ObliquityOfEclipticDemo3D({
   initialObliquity = OBLIQUITY,  // 使用公共常量 23°26′
   minObliquity = 0,
   maxObliquity = 30,
+  onBack,
 }: ObliquityDemo3DProps) {
   const [obliquity, setObliquity] = useState(initialObliquity);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -944,6 +946,9 @@ export default function ObliquityOfEclipticDemo3D({
 
   return (
     <AnimationPageLayout
+      onBack={onBack}
+      pageTitle="黄赤交角"
+      backButtonColor="#6366F1"
       scene3D={scene3D}
       scene2D={scene2D}
       controlPanel={controlPanel}

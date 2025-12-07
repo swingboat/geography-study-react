@@ -910,6 +910,43 @@ export default function TropicsDemo3D(_props: TropicsDemo3DProps) {
         )}
       </div>
 
+      {/* 高考知识点 */}
+      <div style={{
+        padding: 16,
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+        borderRadius: 12,
+        marginBottom: 16,
+      }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366F1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          📚 高考知识点
+        </Typography>
+        <Typography variant="body2" component="div" sx={{ lineHeight: 1.9, fontSize: '12px' }}>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#EF4444' }}>1. 回归线 ⭐⭐⭐</b><br/>
+            • 北回归线：<b>23°26′N</b><br/>
+            • 南回归线：<b>23°26′S</b><br/>
+            • 回归线纬度 = 黄赤交角
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#F59E0B' }}>2. 太阳直射点 ⭐⭐⭐</b><br/>
+            • 范围：南北回归线之间<br/>
+            • 夏至：直射<b>北回归线</b><br/>
+            • 冬至：直射<b>南回归线</b><br/>
+            • 春/秋分：直射<b>赤道</b>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#10B981' }}>3. 五带划分 ⭐⭐</b><br/>
+            • 热带：回归线之间<br/>
+            • 温带：回归线～极圈<br/>
+            • 寒带：极圈以内
+          </div>
+          <div>
+            <b style={{ color: '#3B82F6' }}>4. 公转方向 ⭐</b><br/>
+            • 自西向东（逆时针）
+          </div>
+        </Typography>
+      </div>
+
       {/* 试试看 */}
       <div style={{
         padding: 16,

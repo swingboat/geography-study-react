@@ -716,6 +716,46 @@ export default function ObliquityOfEclipticDemo3D({
         </Typography>
       </div>
 
+      {/* 高考知识点 */}
+      <div
+        style={{
+          padding: 16,
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          borderRadius: 12,
+          marginBottom: 16,
+        }}
+      >
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366F1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+          📚 高考知识点
+        </Typography>
+        <Typography variant="body2" component="div" sx={{ lineHeight: 1.9, fontSize: '12px' }}>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#F59E0B' }}>1. 黄赤交角 ⭐⭐⭐</b><br/>
+            • 黄道面与赤道面夹角<br/>
+            • 目前约为 <b>23°26′</b><br/>
+            • 决定回归线和极圈纬度
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#10B981' }}>2. 地轴倾斜 ⭐⭐⭐</b><br/>
+            • 地轴与黄道面夹角 <b>66°34′</b><br/>
+            • 地轴指向基本不变<br/>
+            • 始终指向北极星附近
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <b style={{ color: '#EF4444' }}>3. 黄赤交角影响 ⭐⭐⭐</b><br/>
+            • 太阳直射点移动范围<br/>
+            • 回归线纬度 = 黄赤交角<br/>
+            • 极圈纬度 = 90° - 黄赤交角
+          </div>
+          <div>
+            <b style={{ color: '#3B82F6' }}>4. 假设变化 ⭐⭐</b><br/>
+            • 若黄赤交角↑：热带寒带↑<br/>
+            • 若黄赤交角↓：温带范围↑<br/>
+            • 若为0°：无四季变化
+          </div>
+        </Typography>
+      </div>
+
       {/* 操作提示 */}
       <div
         style={{

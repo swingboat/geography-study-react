@@ -20,6 +20,8 @@ import {
 import ObliquityOfEclipticDemo3D from './pages/elective1/ObliquityOfEclipticDemo3D';
 import TropicsDemo3D from './pages/elective1/TropicsDemo3D';
 import LongitudeDemo3D from './pages/elective1/LongitudeDemo3D';
+import TimeZoneDemo3D from './pages/elective1/TimeZoneDemo3D';
+import DayNightDemo3D from './pages/elective1/DayNightDemo3D';
 
 // 动画变体
 const containerVariants = {
@@ -207,6 +209,82 @@ function HomePage() {
                         label="✨ 3D 互动" 
                         sx={{ 
                           background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                          color: 'white',
+                          fontWeight: 600
+                        }} 
+                        size="small" 
+                      />
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </motion.div>
+
+              {/* 时区 */}
+              <motion.div variants={itemVariants}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    background: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }
+                  }}
+                >
+                  <CardActionArea component={Link} to="/elective1/timezone" sx={{ height: '100%', p: 1 }}>
+                    <CardContent>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🕐</div>
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                        时区与时差
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        探索时区划分、时差计算、日期变更线与东西半球
+                      </Typography>
+                      <Chip 
+                        label="✨ 3D 互动" 
+                        sx={{ 
+                          background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                          color: 'white',
+                          fontWeight: 600
+                        }} 
+                        size="small" 
+                      />
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </motion.div>
+
+              {/* 昼夜与晨昏线 */}
+              <motion.div variants={itemVariants}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    background: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }
+                  }}
+                >
+                  <CardActionArea component={Link} to="/elective1/daynight" sx={{ height: '100%', p: 1 }}>
+                    <CardContent>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🌓</div>
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                        昼夜与晨昏线
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        探索晨昏线、昼夜长短变化与地方时计算
+                      </Typography>
+                      <Chip 
+                        label="✨ 3D 互动" 
+                        sx={{ 
+                          background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
                           color: 'white',
                           fontWeight: 600
                         }} 
@@ -451,6 +529,142 @@ function LongitudePage() {
   );
 }
 
+// 时区页面
+function TimeZonePage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      {/* 移动端固定返回按钮 */}
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+          }}
+        >
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+              },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        </div>
+      )}
+
+      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#8B5CF6' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>时区与时差</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
+        
+        <TimeZoneDemo3D />
+      </Container>
+    </div>
+  );
+}
+
+// 昼夜与晨昏线页面
+function DayNightPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      {/* 移动端固定返回按钮 */}
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: 1001,
+          }}
+        >
+          <IconButton
+            onClick={() => navigate('/')}
+            sx={{
+              background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+              },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+        </div>
+      )}
+
+      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#F59E0B' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>昼夜与晨昏线</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
+        
+        <DayNightDemo3D />
+      </Container>
+    </div>
+  );
+}
+
 // 主应用组件
 function App() {
   return (
@@ -460,6 +674,8 @@ function App() {
         <Route path="/elective1/obliquity" element={<ObliquityPage />} />
         <Route path="/elective1/tropics" element={<TropicsPage />} />
         <Route path="/elective1/longitude" element={<LongitudePage />} />
+        <Route path="/elective1/timezone" element={<TimeZonePage />} />
+        <Route path="/elective1/daynight" element={<DayNightPage />} />
       </Routes>
     </BrowserRouter>
   );

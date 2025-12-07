@@ -45,6 +45,7 @@ import {
 import {
   ASTRONOMY_COLORS,
   OBLIQUITY,
+  ARCTIC_CIRCLE_LAT,
 } from '../../shared/constants';
 import {
   CameraController,
@@ -523,22 +524,22 @@ function Earth({
           showLabel={showLabels}
         />
 
-        {/* 北极圈 66.5°N */}
+        {/* 北极圈 */}
         <LatitudeLine 
-          latitude={66.5} 
+          latitude={ARCTIC_CIRCLE_LAT} 
           radius={2.01} 
           color={COLORS.arcticCircle} 
-          label="北极圈 66.5°N"
+          label={`北极圈 ${ARCTIC_CIRCLE_LAT.toFixed(2)}°N`}
           showLabel={showLabels}
           dashed
         />
 
-        {/* 南极圈 66.5°S */}
+        {/* 南极圈 */}
         <LatitudeLine 
-          latitude={-66.5} 
+          latitude={-ARCTIC_CIRCLE_LAT} 
           radius={2.01} 
           color={COLORS.antarcticCircle} 
-          label="南极圈 66.5°S"
+          label={`南极圈 ${ARCTIC_CIRCLE_LAT.toFixed(2)}°S`}
           showLabel={showLabels}
           dashed
         />
@@ -1154,22 +1155,40 @@ function ControlPanel({
           </Typography>
         </div>
 
-        {/* 知识卡片 */}
+        {/* 高考知识点 */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)',
-          borderRadius: 8,
-          padding: 12,
+          borderRadius: 12,
+          padding: 16,
           border: '1px solid rgba(59, 130, 246, 0.2)',
         }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#3B82F6', mb: 1 }}>
-            📚 经度知识点
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#3B82F6', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            📚 高考知识点
           </Typography>
-          <Typography variant="caption" component="div" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-            • <span style={{ color: COLORS.primeMeridian }}>本初子午线（0°）</span>：穿过英国格林尼治天文台<br/>
-            • <span style={{ color: COLORS.eastLongitude }}>东经（E）</span>：本初子午线以东，0°~180°<br/>
-            • <span style={{ color: COLORS.westLongitude }}>西经（W）</span>：本初子午线以西，0°~180°<br/>
-            • <span style={{ color: COLORS.dateLine }}>国际日期变更线</span>：大致沿180°经线<br/>
-            • 每15°经度 = 1小时时差
+          <Typography variant="body2" component="div" sx={{ lineHeight: 1.9, fontSize: '12px' }}>
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ color: '#10B981' }}>1. 经度定义 ⭐⭐</b><br/>
+              • <span style={{ color: COLORS.primeMeridian }}>本初子午线(0°)</span>：过格林尼治天文台<br/>
+              • 东经(E)：0°→180°E<br/>
+              • 西经(W)：0°→180°W
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ color: '#3B82F6' }}>2. 东西半球 ⭐⭐</b><br/>
+              • 东半球：<b>20°W→160°E</b><br/>
+              • 西半球：<b>160°E→20°W</b><br/>
+              • <span style={{ color: '#EF4444' }}>注意：不是0°和180°!</span>
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <b style={{ color: '#F59E0B' }}>3. 时差计算 ⭐⭐⭐</b><br/>
+              • 经度每差15° = 1小时<br/>
+              • 经度每差1° = 4分钟<br/>
+              • 东加西减
+            </div>
+            <div>
+              <b style={{ color: '#8B5CF6' }}>4. 日期变更线 ⭐⭐</b><br/>
+              • 大致沿180°经线<br/>
+              • 向东过线日期减一天
+            </div>
           </Typography>
         </div>
       </CardContent>

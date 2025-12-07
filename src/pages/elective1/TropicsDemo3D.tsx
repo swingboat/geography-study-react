@@ -225,8 +225,10 @@ function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthPr
           normalMap={earthNormal}
           normalScale={new THREE.Vector2(0.5, 0.5)}
           roughnessMap={earthSpec}
-          roughness={0.5}
-          metalness={0.1}
+          roughness={0.4}
+          metalness={0.0}
+          emissive="#4a6080"
+          emissiveIntensity={0.2}
         />
       </mesh>
       
@@ -417,8 +419,8 @@ function Scene({ sunLatitude, orbitProgress, showLabels, autoRotate, isYearAnima
 
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[0, 10, 5]} intensity={1} />
+      <ambientLight intensity={1.0} />
+      <directionalLight position={[0, 10, 5]} intensity={1.5} />
       <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
       
       {/* 太阳在中心 */}

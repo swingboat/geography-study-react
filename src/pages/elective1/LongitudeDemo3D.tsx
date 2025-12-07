@@ -478,10 +478,10 @@ function Earth({
             normalMap={earthNormal}
             normalScale={new THREE.Vector2(0.3, 0.3)}
             roughnessMap={earthSpec}
-            roughness={0.4}
+            roughness={0.3}
             metalness={0.0}
-            emissive="#334155"
-            emissiveIntensity={0.15}
+            emissive="#4a6080"
+            emissiveIntensity={0.25}
           />
         </mesh>
         
@@ -693,9 +693,9 @@ function Scene({
 }: SceneProps) {
   return (
     <>
-      <ambientLight intensity={1.2} />
-      <directionalLight position={[5, 3, 5]} intensity={1.5} />
-      <directionalLight position={[-3, 2, -3]} intensity={0.5} />
+      <ambientLight intensity={1.8} />
+      <directionalLight position={[5, 3, 5]} intensity={2.0} />
+      <directionalLight position={[-3, 2, -3]} intensity={0.8} />
       <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
       
       {/* 地球 */}

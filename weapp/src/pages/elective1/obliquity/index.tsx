@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { View, Text, Slider, Button, Canvas } from '@tarojs/components'
 import Taro, { useReady } from '@tarojs/taro'
+import { OBLIQUITY } from '../../../constants'
 import './index.scss'
 
 // 颜色定义
@@ -26,7 +27,7 @@ const COLORS = {
 const degToRad = (deg: number) => (deg * Math.PI) / 180
 
 export default function ObliquityDemo() {
-  const [obliquity, setObliquity] = useState(23.26)
+  const [obliquity, setObliquity] = useState(OBLIQUITY)
   const [isPlaying, setIsPlaying] = useState(true)
   const [orbitAngle, setOrbitAngle] = useState(0)
   const canvasRef = useRef<any>(null)
@@ -203,7 +204,7 @@ export default function ObliquityDemo() {
             <Text className='range'>30°</Text>
           </View>
           <Text className='current-value'>当前倾角：{formatObliquity(obliquity)}</Text>
-          {Math.abs(obliquity - 23.26) < 0.5 && (
+          {Math.abs(obliquity - OBLIQUITY) < 0.5 && (
             <Text className='hint'>✓ 接近实际黄赤交角（约23°26′）</Text>
           )}
         </View>

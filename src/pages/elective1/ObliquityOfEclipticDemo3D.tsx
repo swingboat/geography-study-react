@@ -44,6 +44,7 @@ import {
   AnimationPageLayout,
   SceneLoading,
   type CameraControllerHandle,
+  type InfoCard,
 } from '../../shared/components';
 
 // ===================== 类型定义 =====================
@@ -781,9 +782,57 @@ export default function ObliquityOfEclipticDemo3D({
     </CardContent>
   );
 
-  // 移动端控制面板
+  // 移动端控制面板 - 可展开/收起
+  const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState(false);
+  
   const mobileControlPanel = (
-    <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
+      {/* 展开/收起按钮 */}
+      <div
+        onClick={() => setIsMobilePanelExpanded(!isMobilePanelExpanded)}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px 0',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 30%)',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #6366F1 0%, #A855F7 100%)',
+          borderRadius: 20,
+          padding: '4px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          boxShadow: '0 2px 10px rgba(99, 102, 241, 0.3)',
+        }}>
+          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+            {isMobilePanelExpanded ? '收起' : '黄赤交角控制'}
+          </Typography>
+          <motion.div animate={{ rotate: isMobilePanelExpanded ? 180 : 0 }} style={{ display: 'flex', alignItems: 'center' }}>
+            <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* 可展开内容 */}
+      <AnimatePresence>
+        {isMobilePanelExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
       {/* 标题 */}
       <div style={{
         display: 'flex',
@@ -941,8 +990,75 @@ export default function ObliquityOfEclipticDemo3D({
           )}
         </AnimatePresence>
       </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
+
+  // 知识点卡片内容
+  const infoContent: InfoCard[] = [
+    {
+      title: '黄赤交角概念',
+      icon: '🌍',
+      stars: 3,
+      content: (
+        <div>
+          <p><strong>定义</strong>：黄道面与赤道面之间的夹角</p>
+          <p><strong>数值</strong>：约 23°26′（23.44°）</p>
+          <p><strong>黄道面</strong>：地球绕太阳公转的轨道平面</p>
+          <p><strong>赤道面</strong>：与地轴垂直、过地心的平面</p>
+        </div>
+      ),
+    },
+    {
+      title: '黄赤交角的意义',
+      icon: '⭐',
+      stars: 3,
+      content: (
+        <div>
+          <p>黄赤交角是决定地球上四季变化的根本原因：</p>
+          <p>• 决定了太阳直射点的移动范围（南北回归线之间）</p>
+          <p>• 决定了回归线的纬度位置（23°26′N/S）</p>
+          <p>• 决定了极圈的纬度位置（66°34′N/S）</p>
+          <p>• 影响各地昼夜长短和正午太阳高度的季节变化</p>
+        </div>
+      ),
+    },
+    {
+      title: '假设黄赤交角变化',
+      icon: '🔬',
+      stars: 2,
+      content: (
+        <div>
+          <p><strong>若黄赤交角增大</strong>（如变为30°）：</p>
+          <p>• 回归线纬度增大（30°N/S）</p>
+          <p>• 极圈纬度减小（60°N/S）</p>
+          <p>• 热带和寒带范围扩大，温带范围缩小</p>
+          <p>• 四季变化更加显著</p>
+          <p style={{ marginTop: 8 }}><strong>若黄赤交角减小</strong>（如变为10°）：</p>
+          <p>• 热带和寒带范围缩小，温带范围扩大</p>
+          <p>• 四季变化减弱</p>
+        </div>
+      ),
+    },
+    {
+      title: '五带划分',
+      icon: '🌡️',
+      stars: 2,
+      content: (
+        <div>
+          <p>黄赤交角决定了地球五带的划分：</p>
+          <p>• <strong>热带</strong>：南北回归线之间（有太阳直射）</p>
+          <p>• <strong>北温带</strong>：北回归线至北极圈</p>
+          <p>• <strong>南温带</strong>：南回归线至南极圈</p>
+          <p>• <strong>北寒带</strong>：北极圈以北（有极昼极夜）</p>
+          <p>• <strong>南寒带</strong>：南极圈以南（有极昼极夜）</p>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AnimationPageLayout
@@ -954,6 +1070,7 @@ export default function ObliquityOfEclipticDemo3D({
       controlPanel={controlPanel}
       mobileControlPanel={mobileControlPanel}
       bottomControls={bottomControls}
+      infoContent={infoContent}
       controlHint={(isMobile) => isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
       panelWidth={320}
     />

@@ -55,6 +55,7 @@ import {
   AnimationPageLayout,
   SceneLoading,
   type CameraControllerHandle,
+  type InfoCard,
 } from '../../shared/components';
 
 // ===================== 类型定义 =====================
@@ -968,9 +969,57 @@ export default function TropicsDemo3D({ onBack }: TropicsDemo3DProps) {
     </CardContent>
   );
 
-  // 移动端控制面板
+  // 移动端控制面板 - 可展开/收起
+  const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState(false);
+  
   const mobileControlPanel = (
-    <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
+      {/* 展开/收起按钮 */}
+      <div
+        onClick={() => setIsMobilePanelExpanded(!isMobilePanelExpanded)}
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '8px 0',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.95) 30%)',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #EF4444 0%, #F97316 100%)',
+          borderRadius: 20,
+          padding: '4px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
+        }}>
+          <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+            {isMobilePanelExpanded ? '收起' : '回归线控制'}
+          </Typography>
+          <motion.div animate={{ rotate: isMobilePanelExpanded ? 180 : 0 }} style={{ display: 'flex', alignItems: 'center' }}>
+            <ExpandMoreIcon sx={{ color: 'white', fontSize: 18 }} />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* 可展开内容 */}
+      <AnimatePresence>
+        {isMobilePanelExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
       {/* 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <Typography variant="h6" sx={{
@@ -1094,8 +1143,73 @@ export default function TropicsDemo3D({ onBack }: TropicsDemo3DProps) {
           )}
         </AnimatePresence>
       </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
+
+  // 知识点卡片内容
+  const infoContent: InfoCard[] = [
+    {
+      title: '南北回归线',
+      icon: '🌍',
+      stars: 3,
+      content: (
+        <div>
+          <p><strong>北回归线</strong>：23°26′N，夏至日太阳直射此处</p>
+          <p><strong>南回归线</strong>：23°26′S，冬至日太阳直射此处</p>
+          <p><strong>纬度来源</strong>：回归线的纬度等于黄赤交角的度数</p>
+          <p><strong>名称由来</strong>：太阳直射点到达回归线后开始"回归"，向反方向移动</p>
+        </div>
+      ),
+    },
+    {
+      title: '太阳直射点移动',
+      icon: '☀️',
+      stars: 3,
+      content: (
+        <div>
+          <p>太阳直射点在南北回归线之间往返移动：</p>
+          <p>• <strong>春分</strong>（3月21日）：直射赤道，向北移动</p>
+          <p>• <strong>夏至</strong>（6月22日）：直射北回归线</p>
+          <p>• <strong>秋分</strong>（9月23日）：直射赤道，向南移动</p>
+          <p>• <strong>冬至</strong>（12月22日）：直射南回归线</p>
+          <p style={{ marginTop: 8 }}>移动周期为一年（回归年）</p>
+        </div>
+      ),
+    },
+    {
+      title: '热带范围',
+      icon: '🌴',
+      stars: 2,
+      content: (
+        <div>
+          <p><strong>热带</strong>是指南北回归线之间的地区：</p>
+          <p>• 纬度范围：23°26′S ~ 23°26′N</p>
+          <p>• 特点：一年中有太阳直射现象</p>
+          <p>• 每年有两次太阳直射（赤道上只有两次，回归线上只有一次）</p>
+          <p>• 赤道地区全年昼夜近乎等长</p>
+        </div>
+      ),
+    },
+    {
+      title: '回归线的地理意义',
+      icon: '📍',
+      stars: 2,
+      content: (
+        <div>
+          <p>回归线是重要的地理分界线：</p>
+          <p>• 是热带和温带的分界线</p>
+          <p>• 是太阳能否直射的分界线</p>
+          <p>• 回归线以内：有太阳直射</p>
+          <p>• 回归线以外：没有太阳直射</p>
+          <p style={{ marginTop: 8 }}>经过北回归线的国家：中国、缅甸、印度、沙特阿拉伯等</p>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AnimationPageLayout
@@ -1107,6 +1221,7 @@ export default function TropicsDemo3D({ onBack }: TropicsDemo3DProps) {
       controlPanel={controlPanel}
       mobileControlPanel={mobileControlPanel}
       bottomControls={bottomControls}
+      infoContent={infoContent}
       controlHint={(isMobile) => isMobile ? '👆 拖拽旋转 | 双指缩放' : '🖱️ 拖拽旋转 | 滚轮缩放'}
       panelWidth={320}
     />

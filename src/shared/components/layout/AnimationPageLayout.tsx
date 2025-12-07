@@ -129,7 +129,8 @@ function InfoCarousel({ cards, onClose, accentColor = '#3B82F6' }: InfoCarouselP
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   
-  const swipeConfidenceThreshold = 10000;
+  // 降低滑动阈值，使触摸滑动更容易触发
+  const swipeConfidenceThreshold = 5000;
   const swipePower = (offset: number, velocity: number) => {
     return Math.abs(offset) * velocity;
   };
@@ -144,9 +145,10 @@ function InfoCarousel({ cards, onClose, accentColor = '#3B82F6' }: InfoCarouselP
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, { offset, velocity }: PanInfo) => {
     const swipe = swipePower(offset.x, velocity.x);
-    if (swipe < -swipeConfidenceThreshold) {
+    // 同时检查位移距离，即使速度慢，滑动距离超过50px也触发
+    if (swipe < -swipeConfidenceThreshold || offset.x < -50) {
       paginate(1);
-    } else if (swipe > swipeConfidenceThreshold) {
+    } else if (swipe > swipeConfidenceThreshold || offset.x > 50) {
       paginate(-1);
     }
   };
@@ -233,13 +235,15 @@ function InfoCarousel({ cards, onClose, accentColor = '#3B82F6' }: InfoCarouselP
             }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={1}
+            dragElastic={0.7}
             onDragEnd={handleDragEnd}
+            whileDrag={{ cursor: 'grabbing' }}
             style={{
               position: 'absolute',
               width: '100%',
               height: '100%',
               cursor: 'grab',
+              touchAction: 'pan-y', // 允许垂直滚动，但水平方向由拖动控制
             }}
           >
             {/* 玻璃质感卡片 */}

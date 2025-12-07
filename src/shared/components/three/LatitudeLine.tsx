@@ -29,15 +29,11 @@ interface LatitudeLineProps {
 
 /** 纬线标签组件 - 始终面向相机且保持在纬线圈前方 */
 function LatitudeLabel({ 
-  latitude, 
-  radius, 
   color, 
   label,
   circleRadius,
   y,
 }: { 
-  latitude: number;
-  radius: number;
   color: string;
   label: string;
   circleRadius: number;
@@ -115,8 +111,6 @@ export function LatitudeLine({
       />
       {showLabel && (
         <LatitudeLabel
-          latitude={latitude}
-          radius={radius}
           color={color}
           label={label}
           circleRadius={circleRadius}

@@ -44,6 +44,7 @@ import {
 // 导入公共组件和工具
 import {
   ASTRONOMY_COLORS,
+  OBLIQUITY,
 } from '../../shared/constants';
 import {
   CameraController,
@@ -504,21 +505,21 @@ function Earth({
           showLabel={false}
         />
 
-        {/* 北回归线 23.5°N */}
+        {/* 北回归线 */}
         <LatitudeLine 
-          latitude={23.5} 
+          latitude={OBLIQUITY} 
           radius={2.01} 
           color={COLORS.tropicOfCancer} 
-          label="北回归线 23.5°N"
+          label={`北回归线 ${OBLIQUITY}°N`}
           showLabel={showLabels}
         />
 
-        {/* 南回归线 23.5°S */}
+        {/* 南回归线 */}
         <LatitudeLine 
-          latitude={-23.5} 
+          latitude={-OBLIQUITY} 
           radius={2.01} 
           color={COLORS.tropicOfCapricorn} 
-          label="南回归线 23.5°S"
+          label={`南回归线 ${OBLIQUITY}°S`}
           showLabel={showLabels}
         />
 

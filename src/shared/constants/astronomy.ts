@@ -2,8 +2,8 @@
  * 天文学相关常量
  */
 
-/** 黄赤交角 23°26′ */
-export const OBLIQUITY = 23 + 26 / 60;
+/** 黄赤交角 23.26° (约 23°26′) */
+export const OBLIQUITY = 23.26;
 
 /** 公转轨道半径 */
 export const ORBIT_RADIUS = 8;

@@ -180,11 +180,11 @@ function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthPr
   const glowRef = useRef<THREE.Mesh>(null);
   
   // 正确的物理模型：
-  // 1. 地轴始终倾斜23.5°，指向北极星方向（右上方，+X方向）
+  // 1. 地轴始终倾斜约23.26°，指向北极星方向（右上方，+X方向）
   // 2. rotation Z轴负值表示向右倾斜（北极指向+X方向）
   // 3. 夏至时地球在太阳左上方(-X)，北极朝向太阳(+X方向)，直射北回归线
   // 4. 冬至时地球在太阳右下方(+X)，北极背离太阳，直射南回归线
-  const fixedTiltAngleRad = (OBLIQUITY * Math.PI) / 180; // 固定23.5°倾斜
+  const fixedTiltAngleRad = (OBLIQUITY * Math.PI) / 180; // 固定倾斜角（黄赤交角）
 
   // 加载地球纹理
   const [earthMap, earthNormal, earthSpec, cloudsMap] = useTexture([
@@ -216,7 +216,7 @@ function Earth({ sunLatitude, showLabels, autoRotate, isYearAnimating }: EarthPr
 
   return (
     <group rotation={[0, 0, -fixedTiltAngleRad]}>
-      {/* 地球主体 - 地轴固定倾斜23.5°，北极向右（+X方向/北极星方向）倾斜 */}
+      {/* 地球主体 - 地轴固定倾斜约23.26°，北极向右（+X方向/北极星方向）倾斜 */}
       {/* 夏至时地球在太阳左上(-X)，北极朝向太阳，直射点在北回归线 */}
       <mesh ref={earthRef}>
         <sphereGeometry args={[2, 64, 64]} />

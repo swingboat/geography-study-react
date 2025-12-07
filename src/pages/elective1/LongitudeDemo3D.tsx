@@ -47,6 +47,7 @@ import {
   OBLIQUITY,
   ARCTIC_CIRCLE_LAT,
 } from '../../shared/constants';
+import { formatDegreeMinute } from '../../shared/utils';
 import {
   CameraController,
   LatitudeLine,
@@ -511,7 +512,7 @@ function Earth({
           latitude={OBLIQUITY} 
           radius={2.01} 
           color={COLORS.tropicOfCancer} 
-          label={`北回归线 ${OBLIQUITY}°N`}
+          label={`北回归线 ${formatDegreeMinute(OBLIQUITY)}`}
           showLabel={showLabels}
         />
 
@@ -520,7 +521,7 @@ function Earth({
           latitude={-OBLIQUITY} 
           radius={2.01} 
           color={COLORS.tropicOfCapricorn} 
-          label={`南回归线 ${OBLIQUITY}°S`}
+          label={`南回归线 ${formatDegreeMinute(-OBLIQUITY)}`}
           showLabel={showLabels}
         />
 
@@ -529,7 +530,7 @@ function Earth({
           latitude={ARCTIC_CIRCLE_LAT} 
           radius={2.01} 
           color={COLORS.arcticCircle} 
-          label={`北极圈 ${ARCTIC_CIRCLE_LAT.toFixed(2)}°N`}
+          label={`北极圈 ${formatDegreeMinute(ARCTIC_CIRCLE_LAT)}`}
           showLabel={showLabels}
           dashed
         />
@@ -539,7 +540,7 @@ function Earth({
           latitude={-ARCTIC_CIRCLE_LAT} 
           radius={2.01} 
           color={COLORS.antarcticCircle} 
-          label={`南极圈 ${ARCTIC_CIRCLE_LAT.toFixed(2)}°S`}
+          label={`南极圈 ${formatDegreeMinute(-ARCTIC_CIRCLE_LAT)}`}
           showLabel={showLabels}
           dashed
         />

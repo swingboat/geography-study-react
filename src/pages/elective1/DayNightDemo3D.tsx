@@ -151,7 +151,7 @@ const formatDayLength = (hours: number): string => {
 // ===================== 3D 组件 =====================
 
 /** 太阳组件 */
-function Sun3D({ subsolarLat }: { subsolarLat: number }) {
+function Sun3D({ subsolarLat, showSunRays }: { subsolarLat: number; showSunRays: boolean }) {
   const sunRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   
@@ -165,6 +165,13 @@ function Sun3D({ subsolarLat }: { subsolarLat: number }) {
     0
   ];
 
+  // 太阳直射点在地球表面的位置
+  const subsolarPointOnEarth: [number, number, number] = [
+    2 * Math.cos(latRad),
+    2 * Math.sin(latRad),
+    0
+  ];
+
   useFrame(({ clock }) => {
     if (glowRef.current) {
       const scale = 1 + Math.sin(clock.elapsedTime * 2) * 0.1;
@@ -172,37 +179,67 @@ function Sun3D({ subsolarLat }: { subsolarLat: number }) {
     }
   });
 
+  // 生成太阳直射线
+  const sunRay = useMemo(() => {
+    if (!showSunRays) return null;
+    
+    // 主直射线（从太阳到直射点）
+    return {
+      start: sunPosition,
+      end: subsolarPointOnEarth,
+    };
+  }, [sunPosition, subsolarPointOnEarth, showSunRays]);
+
   return (
-    <group position={sunPosition}>
-      {/* 太阳本体 */}
-      <mesh ref={sunRef}>
-        <sphereGeometry args={[0.5, 32, 32]} />
-        <meshBasicMaterial color={COLORS.sun} />
-      </mesh>
-      
-      {/* 光晕 */}
-      <mesh ref={glowRef}>
-        <sphereGeometry args={[0.7, 32, 32]} />
-        <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
-      </mesh>
-      
-      {/* 太阳光线 */}
-      <pointLight color={COLORS.sun} intensity={2} distance={20} />
-      
-      {/* 太阳标签 */}
-      <Html position={[0, 1, 0]} center>
-        <div style={{
-          background: 'rgba(251, 191, 36, 0.9)',
-          color: 'white',
-          padding: '4px 8px',
-          borderRadius: 6,
-          fontSize: 11,
-          fontWeight: 600,
-          whiteSpace: 'nowrap',
-        }}>
-          ☀️ 太阳
-        </div>
-      </Html>
+    <group>
+      <group position={sunPosition}>
+        {/* 太阳本体 */}
+        <mesh ref={sunRef}>
+          <sphereGeometry args={[0.5, 32, 32]} />
+          <meshBasicMaterial color={COLORS.sun} />
+        </mesh>
+        
+        {/* 光晕 */}
+        <mesh ref={glowRef}>
+          <sphereGeometry args={[0.7, 32, 32]} />
+          <meshBasicMaterial color={COLORS.sunGlow} transparent opacity={0.3} />
+        </mesh>
+        
+        {/* 太阳光源 */}
+        <pointLight color={COLORS.sun} intensity={2} distance={20} />
+        
+        {/* 太阳标签 */}
+        <Html position={[0, 1, 0]} center>
+          <div style={{
+            background: 'rgba(251, 191, 36, 0.9)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}>
+            ☀️ 太阳
+          </div>
+        </Html>
+      </group>
+
+      {/* 太阳直射线 */}
+      {showSunRays && sunRay && (
+        <Line
+          points={[sunRay.start, sunRay.end]}
+          color="#FF6B6B"
+          lineWidth={3}
+        />
+      )}
+
+      {/* 直射点标记 */}
+      {showSunRays && (
+        <mesh position={subsolarPointOnEarth}>
+          <sphereGeometry args={[0.08, 16, 16]} />
+          <meshBasicMaterial color="#FF6B6B" />
+        </mesh>
+      )}
     </group>
   );
 }
@@ -259,15 +296,17 @@ function TerminatorLine({
   }, [subsolarLat, hourOffset]);
 
   // 计算晨线和昏线标签位置
+  // 晨线在地球的+Z侧（面向相机时的右侧），昏线在-Z侧
   const dawnPosition = useMemo(() => {
-    const radius = 2.3;
+    const radius = 2.2;
     const subsolarLatRad = subsolarLat * Math.PI / 180;
-    // 晨线在地球正面的赤道附近
-    let x = 0;
-    let y = radius;
-    let z = 0;
     
-    // 应用相同的旋转
+    // 晨线上赤道位置的点：在+Z方向
+    let x = 0;
+    let y = 0;
+    let z = radius;
+    
+    // 绕Z轴倾斜（与晨昏线相同的旋转）
     const cosLat = Math.cos(subsolarLatRad);
     const sinLat = Math.sin(subsolarLatRad);
     const x2 = x * cosLat - y * sinLat;
@@ -277,12 +316,13 @@ function TerminatorLine({
   }, [subsolarLat]);
 
   const duskPosition = useMemo(() => {
-    const radius = 2.3;
+    const radius = 2.2;
     const subsolarLatRad = subsolarLat * Math.PI / 180;
-    // 昏线在地球正面的赤道附近（下方）
+    
+    // 昏线上赤道位置的点：在-Z方向
     let x = 0;
-    let y = -radius;
-    let z = 0;
+    let y = 0;
+    let z = -radius;
     
     const cosLat = Math.cos(subsolarLatRad);
     const sinLat = Math.sin(subsolarLatRad);
@@ -387,7 +427,7 @@ function NoonLine({
     return pts;
   }, []);
 
-  // 太阳直射点位置
+  // 太阳直射点位置 - 在正午线上
   const subsolarPosition: [number, number, number] = useMemo(() => {
     const radius = 2.15;
     const latRad = subsolarLat * Math.PI / 180;
@@ -395,6 +435,18 @@ function NoonLine({
       Math.cos(latRad) * radius,
       Math.sin(latRad) * radius,
       0
+    ];
+  }, [subsolarLat]);
+
+  // 直射点标签位置 - 稍微偏移到Z轴负方向，避免和纬线标签重叠
+  const subsolarLabelPosition: [number, number, number] = useMemo(() => {
+    const radius = 2.15;
+    const latRad = subsolarLat * Math.PI / 180;
+    const zOffset = -0.8; // Z轴偏移
+    return [
+      Math.cos(latRad) * radius * 0.9,
+      Math.sin(latRad) * radius + 0.3, // Y轴稍微上移
+      zOffset
     ];
   }, [subsolarLat]);
 
@@ -418,7 +470,7 @@ function NoonLine({
       
       {/* 太阳直射点标签 */}
       {showLabel && isVisible && (
-        <group position={subsolarPosition}>
+        <group position={subsolarLabelPosition}>
           <Html center>
             <div style={{
               background: 'rgba(239, 68, 68, 0.9)',
@@ -443,11 +495,11 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
   // 创建一个半透明的球体来表示夜半球
   const nightRef = useRef<THREE.Mesh>(null);
   
-  // 夜半球材质
+  // 夜半球材质 - 不依赖 subsolarLat，避免重复创建
   const nightMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        subsolarLat: { value: subsolarLat * Math.PI / 180 },
+        subsolarLat: { value: 0 },
       },
       vertexShader: `
         varying vec3 vNormal;
@@ -486,12 +538,12 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
       side: THREE.FrontSide,
       depthWrite: false,
     });
-  }, [subsolarLat]);
+  }, []);
 
-  // 更新uniform
-  useMemo(() => {
+  // 使用 useFrame 更新 uniform，确保每帧都是最新值
+  useFrame(() => {
     nightMaterial.uniforms.subsolarLat.value = subsolarLat * Math.PI / 180;
-  }, [subsolarLat, nightMaterial]);
+  });
 
   return (
     <mesh ref={nightRef} material={nightMaterial}>
@@ -604,6 +656,7 @@ interface SceneProps {
   showNoonLine: boolean;
   showShading: boolean;
   showSun: boolean;
+  showSunRays: boolean;
   cameraRef: React.RefObject<CameraControllerHandle>;
 }
 
@@ -615,6 +668,7 @@ function Scene({
   showNoonLine,
   showShading,
   showSun,
+  showSunRays,
   cameraRef,
 }: SceneProps) {
   return (
@@ -625,7 +679,7 @@ function Scene({
       <Stars radius={100} depth={50} count={5000} factor={4} fade speed={1} />
       
       <Suspense fallback={null}>
-        {showSun && <Sun3D subsolarLat={subsolarLat} />}
+        {showSun && <Sun3D subsolarLat={subsolarLat} showSunRays={showSunRays} />}
         <Earth 
           showLabels={showLabels}
           autoRotate={autoRotate}
@@ -636,7 +690,7 @@ function Scene({
         />
       </Suspense>
       
-      <CameraController ref={cameraRef} defaultPosition={[6, 2, 4]} />
+      <CameraController ref={cameraRef} defaultPosition={[14, 5, 10]} />
     </>
   );
 }
@@ -879,6 +933,8 @@ interface ControlPanelProps {
   setShowShading: (show: boolean) => void;
   showSun: boolean;
   setShowSun: (show: boolean) => void;
+  showSunRays: boolean;
+  setShowSunRays: (show: boolean) => void;
 }
 
 function ControlPanel({
@@ -894,6 +950,8 @@ function ControlPanel({
   setShowShading,
   showSun,
   setShowSun,
+  showSunRays,
+  setShowSunRays,
 }: ControlPanelProps) {
 
   return (
@@ -1010,6 +1068,15 @@ function ControlPanel({
                 color: showSun ? 'white' : 'text.secondary',
               }}
             />
+            <Chip
+              label="直射线"
+              size="small"
+              onClick={() => setShowSunRays(!showSunRays)}
+              sx={{
+                background: showSunRays ? '#FF6B6B' : 'rgba(0,0,0,0.05)',
+                color: showSunRays ? 'white' : 'text.secondary',
+              }}
+            />
           </div>
         </div>
 
@@ -1030,21 +1097,38 @@ function ControlPanel({
           <Typography variant="body2" component="div" sx={{ lineHeight: 1.9, fontSize: '12px' }}>
             <div style={{ marginBottom: 12 }}>
               <b style={{ color: '#F59E0B' }}>1. 晨昏线 ⭐⭐⭐</b><br/>
-              • <span style={{ color: '#10B981' }}>晨线</span>：夜→昼的分界线<br/>
-              • <span style={{ color: '#8B5CF6' }}>昏线</span>：昼→夜的分界线<br/>
-              • 晨昏线是过地心的大圆
+              • <span style={{ color: '#10B981' }}>晨线</span>：夜→昼的分界线（日出线）<br/>
+              • <span style={{ color: '#8B5CF6' }}>昏线</span>：昼→夜的分界线（日落线）<br/>
+              • 晨昏线是过地心的大圆，始终<b>垂直于太阳光线</b>
+            </div>
+            
+            <div style={{ marginBottom: 12, background: 'rgba(239, 68, 68, 0.08)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              <b style={{ color: '#EF4444' }}>2. 地方时 ⭐⭐⭐（重点）</b><br/>
+              <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px' }}>
+                地方时由<b>经度</b>决定，同一经线地方时相同
+              </div>
+              • 太阳直射经线 = <b style={{ color: '#EF4444' }}>12:00</b>（正午）<br/>
+              • 直射点对面经线 = <b>0:00/24:00</b>（午夜）<br/>
+              • <span style={{ color: '#10B981' }}>晨线</span>与赤道交点 = <b style={{ color: '#10B981' }}>6:00</b><br/>
+              • <span style={{ color: '#8B5CF6' }}>昏线</span>与赤道交点 = <b style={{ color: '#8B5CF6' }}>18:00</b><br/>
+              <div style={{ fontSize: '11px', marginTop: '6px', padding: '4px', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '4px' }}>
+                💡 <b>推导</b>：地球24h转360°，每小时转15°<br/>
+                晨线比正午线落后90°，即 90°÷15°/h = <b>6h</b>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <b style={{ color: '#06B6D4' }}>3. 地方时计算 ⭐⭐⭐</b><br/>
+              • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
+              • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
+              • <b>东加西减</b>：东边时间早，西边时间晚<br/>
+              <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
+                公式：所求地方时 = 已知地方时 ± 经度差×4分钟
+              </div>
             </div>
             
             <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#EF4444' }}>2. 晨昏线与地方时 ⭐⭐⭐</b><br/>
-              • 晨线上地方时 = <b>6:00</b><br/>
-              • 昏线上地方时 = <b>18:00</b><br/>
-              • 直射点经线 = <b>12:00</b><br/>
-              • 对面经线 = <b>0:00/24:00</b>
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#3B82F6' }}>3. 太阳直射点移动 ⭐⭐</b><br/>
+              <b style={{ color: '#3B82F6' }}>4. 太阳直射点移动 ⭐⭐</b><br/>
               • 春分→夏至：向<b>北</b>移<br/>
               • 夏至→秋分：向<b>南</b>移<br/>
               • 秋分→冬至：向<b>南</b>移<br/>
@@ -1052,18 +1136,18 @@ function ControlPanel({
             </div>
             
             <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#10B981' }}>4. 昼夜长短规律 ⭐⭐⭐</b><br/>
+              <b style={{ color: '#10B981' }}>5. 昼夜长短规律 ⭐⭐⭐</b><br/>
               • 直射点所在半球：<b>昼长夜短</b><br/>
               • 纬度越高变化越大<br/>
-              • 赤道终年昼夜平分<br/>
-              • 极圈内有极昼极夜
+              • 赤道终年昼夜平分（12小时）<br/>
+              • 极圈内有极昼极夜现象
             </div>
             
             <div>
-              <b style={{ color: '#8B5CF6' }}>5. 特殊日期 ⭐⭐</b><br/>
-              • 春/秋分：全球昼夜平分<br/>
-              • 夏至：北半球昼最长<br/>
-              • 冬至：北半球夜最长
+              <b style={{ color: '#8B5CF6' }}>6. 特殊日期 ⭐⭐</b><br/>
+              • 春/秋分：全球昼夜平分，晨昏线过两极<br/>
+              • 夏至：北半球昼最长，北极圈内极昼<br/>
+              • 冬至：北半球夜最长，北极圈内极夜
             </div>
           </Typography>
         </div>
@@ -1217,6 +1301,7 @@ export default function DayNightDemo3D({
   const [showNoonLine, setShowNoonLine] = useState(true);
   const [showShading, setShowShading] = useState(true);
   const [showSun, setShowSun] = useState(true);
+  const [showSunRays, setShowSunRays] = useState(true);
   
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
 
@@ -1231,29 +1316,37 @@ export default function DayNightDemo3D({
       </Typography>
       <Typography variant="body2" component="div" sx={{ lineHeight: 2 }}>
         <b>1. 晨昏线 ⭐⭐⭐</b><br/>
-        • 晨昏线是昼夜半球的分界线<br/>
-        • <span style={{color: '#10B981'}}>晨线</span>：由夜半球进入昼半球的界线<br/>
-        • <span style={{color: '#8B5CF6'}}>昏线</span>：由昼半球进入夜半球的界线<br/><br/>
+        • 晨昏线是昼夜半球的分界线，始终<b>垂直于太阳光线</b><br/>
+        • <span style={{color: '#10B981'}}>晨线</span>：由夜半球进入昼半球的界线（日出线）<br/>
+        • <span style={{color: '#8B5CF6'}}>昏线</span>：由昼半球进入夜半球的界线（日落线）<br/><br/>
         
-        <b>2. 晨昏线与地方时 ⭐⭐⭐</b><br/>
-        • <span style={{color: '#10B981'}}>晨线上各点地方时为 <b>6:00</b></span><br/>
-        • <span style={{color: '#8B5CF6'}}>昏线上各点地方时为 <b>18:00</b></span><br/>
-        • <span style={{color: '#EF4444'}}>太阳直射点所在经线地方时为 <b>12:00</b></span><br/>
-        • 与直射点相对的经线地方时为 <b>0:00/24:00</b><br/><br/>
+        <b>2. 地方时 ⭐⭐⭐（核心）</b><br/>
+        • 地方时由<b>经度</b>决定，同一经线上地方时相同<br/>
+        • <span style={{color: '#EF4444'}}>太阳直射经线 = <b>12:00</b>（正午）</span><br/>
+        • 直射点对面经线 = <b>0:00/24:00</b>（午夜）<br/>
+        • <span style={{color: '#10B981'}}>晨线与赤道交点 = <b>6:00</b></span><br/>
+        • <span style={{color: '#8B5CF6'}}>昏线与赤道交点 = <b>18:00</b></span><br/>
+        • 💡 推导：地球24h转360°，每小时15°；晨线比正午线落后90°= 6小时<br/><br/>
         
-        <b>3. 太阳直射点移动 ⭐⭐</b><br/>
+        <b>3. 地方时计算 ⭐⭐⭐</b><br/>
+        • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
+        • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
+        • <b>东加西减</b>：东边时间早，西边时间晚<br/>
+        • 公式：所求地方时 = 已知地方时 ± 经度差×4分钟<br/><br/>
+        
+        <b>4. 太阳直射点移动 ⭐⭐</b><br/>
         • 春分(3/21)→夏至(6/22)：向北移动<br/>
         • 夏至(6/22)→秋分(9/23)：向南移动<br/>
         • 秋分(9/23)→冬至(12/22)：向南移动<br/>
         • 冬至(12/22)→春分(3/21)：向北移动<br/><br/>
         
-        <b>4. 昼夜长短变化 ⭐⭐⭐</b><br/>
+        <b>5. 昼夜长短变化 ⭐⭐⭐</b><br/>
         • 太阳直射点在哪个半球，该半球昼长夜短<br/>
         • 纬度越高，昼夜长短变化越大<br/>
         • 赤道上全年昼夜平分（12小时）<br/>
         • 极圈内有极昼极夜现象<br/><br/>
         
-        <b>5. 特殊纬度 ⭐</b><br/>
+        <b>6. 特殊纬度 ⭐</b><br/>
         • 回归线（23°26′）：太阳直射的最北/南界限<br/>
         • 极圈（66°34′）：极昼极夜的最低纬度
       </Typography>
@@ -1264,7 +1357,7 @@ export default function DayNightDemo3D({
     <AnimationPageLayout
       scene3D={
         <Suspense fallback={<SceneLoading />}>
-          <Canvas camera={{ position: [6, 2, 4], fov: 50 }} style={{ width: '100%', height: '100%' }}>
+          <Canvas camera={{ position: [14, 5, 10], fov: 50 }} style={{ width: '100%', height: '100%' }}>
             <Scene
               showLabels={showLabels}
               autoRotate={autoRotate}
@@ -1273,6 +1366,7 @@ export default function DayNightDemo3D({
               showNoonLine={showNoonLine}
               showShading={showShading}
               showSun={showSun}
+              showSunRays={showSunRays}
               cameraRef={cameraControllerRef}
             />
           </Canvas>
@@ -1297,6 +1391,8 @@ export default function DayNightDemo3D({
           setShowShading={setShowShading}
           showSun={showSun}
           setShowSun={setShowSun}
+          showSunRays={showSunRays}
+          setShowSunRays={setShowSunRays}
         />
       }
       mobileControlPanel={

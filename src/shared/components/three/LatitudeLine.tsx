@@ -5,8 +5,10 @@
  */
 
 import { useMemo } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Line, Html } from '@react-three/drei';
 import { calculateLatitudePosition } from '../../utils';
+import * as THREE from 'three';
 
 interface LatitudeLineProps {
   /** 纬度（度），正数为北纬，负数为南纬 */
@@ -23,6 +25,58 @@ interface LatitudeLineProps {
   dashed?: boolean;
   /** 线条宽度，默认 2 */
   lineWidth?: number;
+}
+
+/** 纬线标签组件 - 始终面向相机且保持在纬线圈前方 */
+function LatitudeLabel({ 
+  latitude, 
+  radius, 
+  color, 
+  label,
+  circleRadius,
+  y,
+}: { 
+  latitude: number;
+  radius: number;
+  color: string;
+  label: string;
+  circleRadius: number;
+  y: number;
+}) {
+  const { camera } = useThree();
+  const labelRef = useMemo(() => ({ position: new THREE.Vector3(circleRadius + 0.3, y, 0) }), [circleRadius, y]);
+
+  useFrame(() => {
+    // 获取相机在 XZ 平面的方向
+    const cameraDir = new THREE.Vector3();
+    camera.getWorldDirection(cameraDir);
+    
+    // 计算相机在 XZ 平面的角度
+    const angle = Math.atan2(-cameraDir.x, -cameraDir.z);
+    
+    // 将标签放在纬线圈上最靠近相机的位置
+    labelRef.position.set(
+      Math.cos(angle) * (circleRadius + 0.15),
+      y,
+      Math.sin(angle) * (circleRadius + 0.15)
+    );
+  });
+
+  return (
+    <Html position={labelRef.position} center>
+      <div style={{
+        color: color,
+        fontSize: '11px',
+        fontWeight: 'bold',
+        whiteSpace: 'nowrap',
+        background: 'rgba(0,0,0,0.5)',
+        padding: '2px 6px',
+        borderRadius: 4,
+      }}>
+        {label}
+      </div>
+    </Html>
+  );
 }
 
 export function LatitudeLine({
@@ -60,19 +114,14 @@ export function LatitudeLine({
         gapSize={0.05}
       />
       {showLabel && (
-        <Html position={[circleRadius + 0.3, y, 0]} center>
-          <div style={{
-            color: color,
-            fontSize: '11px',
-            fontWeight: 'bold',
-            whiteSpace: 'nowrap',
-            background: 'rgba(0,0,0,0.5)',
-            padding: '2px 6px',
-            borderRadius: 4,
-          }}>
-            {label}
-          </div>
-        </Html>
+        <LatitudeLabel
+          latitude={latitude}
+          radius={radius}
+          color={color}
+          label={label}
+          circleRadius={circleRadius}
+          y={y}
+        />
       )}
     </group>
   );

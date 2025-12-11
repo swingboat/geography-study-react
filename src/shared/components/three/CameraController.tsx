@@ -14,6 +14,8 @@ export interface CameraControllerHandle {
   reset: () => void;
   /** 让相机转动到查看指定经纬度位置 */
   lookAtLongLat: (longitude: number, latitude: number, animate?: boolean) => void;
+  /** 设置相机位置并看向原点 */
+  setPosition: (position: [number, number, number], animate?: boolean) => void;
 }
 
 interface CameraControllerProps {
@@ -97,6 +99,42 @@ export const CameraController = forwardRef<CameraControllerHandle, CameraControl
           animateCamera();
         } else {
           camera.position.set(targetX, targetY, targetZ);
+          camera.lookAt(0, 0, 0);
+          if (controlsRef.current) {
+            controlsRef.current.update();
+          }
+        }
+      },
+      setPosition: (position: [number, number, number], animate = true) => {
+        if (animate) {
+          const startPos = camera.position.clone();
+          const endPos = new THREE.Vector3(...position);
+          const duration = 800;
+          const startTime = Date.now();
+          
+          const animateCamera = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const eased = progress < 0.5
+              ? 4 * progress * progress * progress
+              : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            
+            camera.position.lerpVectors(startPos, endPos, eased);
+            camera.lookAt(0, 0, 0);
+            
+            if (controlsRef.current) {
+              controlsRef.current.update();
+            }
+            
+            if (progress < 1) {
+              requestAnimationFrame(animateCamera);
+            }
+          };
+          
+          animateCamera();
+        } else {
+          camera.position.set(...position);
           camera.lookAt(0, 0, 0);
           if (controlsRef.current) {
             controlsRef.current.update();

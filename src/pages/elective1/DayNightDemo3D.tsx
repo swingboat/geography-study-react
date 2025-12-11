@@ -10,7 +10,7 @@
  * 5. 不同纬度的昼夜情况
  */
 
-import { useRef, useState, useMemo, Suspense } from 'react';
+import { useRef, useState, useMemo, Suspense, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { 
   Stars, 
@@ -37,7 +37,6 @@ import {
   LabelOff as LabelOffIcon,
   ExpandMore as ExpandMoreIcon,
   WbSunny as SunIcon,
-  NightsStay as MoonIcon,
 } from '@mui/icons-material';
 
 // 导入公共组件和工具
@@ -63,6 +62,9 @@ interface DayNightDemo3DProps {
 }
 
 // ===================== 常量 =====================
+
+/** 地球半径 */
+const EARTH_RADIUS = 4;
 
 const COLORS = {
   sun: '#FCD34D',
@@ -96,6 +98,27 @@ const SPECIAL_LATITUDES = [
   { name: '南回归线', lat: -OBLIQUITY, color: COLORS.tropicCapricorn },
   { name: '南极圈', lat: -ARCTIC_CIRCLE_LAT, color: COLORS.antarcticCircle },
 ];
+
+/** 常用城市数据 */
+const FAMOUS_CITIES = [
+  { name: '北京', lat: 39.9, lon: 116.4, timezone: 8 },
+  { name: '上海', lat: 31.2, lon: 121.5, timezone: 8 },
+  { name: '广州', lat: 23.1, lon: 113.3, timezone: 8 },
+  { name: '东京', lat: 35.7, lon: 139.7, timezone: 9 },
+  { name: '伦敦', lat: 51.5, lon: 0, timezone: 0 },
+  { name: '纽约', lat: 40.7, lon: -74.0, timezone: -5 },
+  { name: '悉尼', lat: -33.9, lon: 151.2, timezone: 10 },
+  { name: '开普敦', lat: -33.9, lon: 18.4, timezone: 2 },
+  { name: '莫斯科', lat: 55.8, lon: 37.6, timezone: 3 },
+  { name: '新加坡', lat: 1.3, lon: 103.8, timezone: 8 },
+];
+
+interface CityInfo {
+  name: string;
+  lat: number;
+  lon: number;
+  timezone: number;
+}
 
 // ===================== 工具函数 =====================
 
@@ -149,6 +172,44 @@ const formatDayLength = (hours: number): string => {
   return `${h}小时${m}分`;
 };
 
+/** 根据UTC小时和经度计算地方时 */
+const getLocalTime = (utcHour: number, longitude: number): number => {
+  // 经度每15度对应1小时时差
+  const localTime = utcHour + longitude / 15;
+  // 归一化到0-24
+  return ((localTime % 24) + 24) % 24;
+};
+
+/** 根据地方时和太阳直射点纬度判断某地是白天还是黑夜 */
+const isDaytime = (localTime: number, latitude: number, subsolarLat: number): boolean => {
+  const dayLength = getDayLength(latitude, subsolarLat);
+  if (dayLength === 24) return true;  // 极昼
+  if (dayLength === 0) return false;  // 极夜
+  
+  // 日出时间 = 12 - 昼长/2，日落时间 = 12 + 昼长/2
+  const sunrise = 12 - dayLength / 2;
+  const sunset = 12 + dayLength / 2;
+  
+  return localTime >= sunrise && localTime < sunset;
+};
+
+/** 计算日出日落时间 */
+const getSunriseSunset = (latitude: number, subsolarLat: number): { sunrise: number; sunset: number } | null => {
+  const dayLength = getDayLength(latitude, subsolarLat);
+  if (dayLength === 24 || dayLength === 0) return null; // 极昼极夜
+  
+  const sunrise = 12 - dayLength / 2;
+  const sunset = 12 + dayLength / 2;
+  return { sunrise, sunset };
+};
+
+/** 格式化时间为 HH:MM */
+const formatTime = (hours: number): string => {
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
+
 // ===================== 3D 组件 =====================
 
 /** 太阳组件 */
@@ -168,8 +229,8 @@ function Sun3D({ subsolarLat, showSunRays }: { subsolarLat: number; showSunRays:
 
   // 太阳直射点在地球表面的位置
   const subsolarPointOnEarth: [number, number, number] = [
-    2 * Math.cos(latRad),
-    2 * Math.sin(latRad),
+    EARTH_RADIUS * Math.cos(latRad),
+    EARTH_RADIUS * Math.sin(latRad),
     0
   ];
 
@@ -245,17 +306,186 @@ function Sun3D({ subsolarLat, showSunRays }: { subsolarLat: number; showSunRays:
   );
 }
 
+/** 经纬度标签组件 */
+function GraticuleLabel({ 
+  text, 
+  position, 
+  color = '#ffffff' 
+}: { 
+  text: string; 
+  position: THREE.Vector3;
+  color?: string;
+}) {
+  const { camera } = useThree();
+  const groupRef = useRef<THREE.Group>(null);
+  const [isVisible, setIsVisible] = useState(true);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    
+    // 获取标签的世界坐标
+    const worldPos = new THREE.Vector3();
+    groupRef.current.getWorldPosition(worldPos);
+    
+    // 计算法向量和相机方向
+    const normal = worldPos.clone().normalize();
+    const toCamera = camera.position.clone().sub(worldPos).normalize();
+    
+    setIsVisible(normal.dot(toCamera) > 0.15);
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      {isVisible && (
+        <Html center zIndexRange={[50, 0]}>
+          <div style={{
+            color: color,
+            fontSize: '9px',
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            background: 'rgba(0,0,0,0.4)',
+            padding: '1px 4px',
+            borderRadius: 3,
+            opacity: 0.8,
+          }}>
+            {text}
+          </div>
+        </Html>
+      )}
+    </group>
+  );
+}
+
+/** 经纬网格组件 */
+function Graticule({ radius, showLabels = true }: { radius: number; showLabels?: boolean }) {
+  // 生成纬线点（每15度一条，不含极点和已有的特殊纬线）
+  const latitudeLines = useMemo(() => {
+    const allLines: { points: [number, number, number][]; lat: number }[] = [];
+    const skipLats = [0, OBLIQUITY, -OBLIQUITY, ARCTIC_CIRCLE_LAT, -ARCTIC_CIRCLE_LAT]; // 跳过已有的特殊纬线
+    
+    for (let lat = -75; lat <= 75; lat += 15) {
+      // 跳过特殊纬线（赤道、回归线、极圈）
+      if (skipLats.some(skip => Math.abs(lat - skip) < 1)) continue;
+      
+      const latRad = (lat * Math.PI) / 180;
+      const r = Math.cos(latRad) * radius;
+      const y = Math.sin(latRad) * radius;
+      
+      const points: [number, number, number][] = [];
+      for (let lon = 0; lon <= 360; lon += 5) {
+        const lonRad = (lon * Math.PI) / 180;
+        points.push([
+          r * Math.cos(lonRad),
+          y,
+          -r * Math.sin(lonRad)
+        ]);
+      }
+      allLines.push({ points, lat });
+    }
+    return allLines;
+  }, [radius]);
+
+  // 生成经线点（每15度一条）
+  const longitudeLines = useMemo(() => {
+    const allLines: { points: [number, number, number][]; lon: number }[] = [];
+    
+    for (let lon = 0; lon < 360; lon += 15) {
+      const lonRad = (lon * Math.PI) / 180;
+      const points: [number, number, number][] = [];
+      
+      for (let lat = -90; lat <= 90; lat += 5) {
+        const latRad = (lat * Math.PI) / 180;
+        points.push([
+          radius * Math.cos(latRad) * Math.cos(lonRad),
+          radius * Math.sin(latRad),
+          -radius * Math.cos(latRad) * Math.sin(lonRad)
+        ]);
+      }
+      allLines.push({ points, lon });
+    }
+    return allLines;
+  }, [radius]);
+
+  // 纬度标签位置（放在本初子午线上）
+  const latLabels = useMemo(() => {
+    const labels: { text: string; position: THREE.Vector3 }[] = [];
+    const labelRadius = radius + 0.08;
+    const skipLats = [0, OBLIQUITY, -OBLIQUITY, ARCTIC_CIRCLE_LAT, -ARCTIC_CIRCLE_LAT]; // 跳过已有特殊纬线
+    
+    for (let lat = -75; lat <= 75; lat += 15) {
+      // 跳过特殊纬线（赤道、回归线、极圈）
+      if (skipLats.some(skip => Math.abs(lat - skip) < 1)) continue;
+      
+      const latRad = (lat * Math.PI) / 180;
+      const position = new THREE.Vector3(
+        labelRadius * Math.cos(latRad),
+        labelRadius * Math.sin(latRad),
+        0
+      );
+      labels.push({
+        text: `${Math.abs(lat)}°${lat > 0 ? 'N' : 'S'}`,
+        position
+      });
+    }
+    return labels;
+  }, [radius]);
+
+  // 经度标签位置（放在赤道上）
+  const lonLabels = useMemo(() => {
+    const labels: { text: string; position: THREE.Vector3 }[] = [];
+    const labelRadius = radius + 0.08;
+    
+    for (let lon = 0; lon < 360; lon += 15) {
+      const lonRad = (lon * Math.PI) / 180;
+      const displayLon = lon > 180 ? lon - 360 : lon;
+      const position = new THREE.Vector3(
+        labelRadius * Math.cos(lonRad),
+        0,
+        -labelRadius * Math.sin(lonRad)
+      );
+      labels.push({
+        text: displayLon === 0 ? '0°' : `${Math.abs(displayLon)}°${displayLon > 0 ? 'E' : 'W'}`,
+        position
+      });
+    }
+    return labels;
+  }, [radius]);
+
+  return (
+    <group>
+      {/* 纬线 */}
+      {latitudeLines.map(({ points }, i) => (
+        <Line key={`lat-${i}`} points={points} color="#ffffff" lineWidth={0.5} transparent opacity={0.2} />
+      ))}
+      {/* 经线 */}
+      {longitudeLines.map(({ points }, i) => (
+        <Line key={`lon-${i}`} points={points} color="#ffffff" lineWidth={0.5} transparent opacity={0.2} />
+      ))}
+      {/* 纬度标签 */}
+      {showLabels && latLabels.map(({ text, position }, i) => (
+        <GraticuleLabel key={`lat-label-${i}`} text={text} position={position} />
+      ))}
+      {/* 经度标签 */}
+      {showLabels && lonLabels.map(({ text, position }, i) => (
+        <GraticuleLabel key={`lon-label-${i}`} text={text} position={position} />
+      ))}
+    </group>
+  );
+}
+
 /** 晨昏线组件 - 大圆 */
 function TerminatorLine({ 
   subsolarLat, 
   showLabels,
   showDawn = true,
   showDusk = true,
+  utcHour,
 }: { 
   subsolarLat: number;
   showLabels: boolean;
   showDawn?: boolean;
   showDusk?: boolean;
+  utcHour: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
@@ -263,110 +493,120 @@ function TerminatorLine({
   const [duskVisible, setDuskVisible] = useState(true);
 
   // 晨昏线是与太阳光线垂直的大圆
-  // 正午线在 X-Y 平面 (z=0)，经度 0°
-  // 晨线在正午线西边 90°，即 +Z 方向，经度 90°W（或 270°E）
-  // 昏线在正午线东边 90°，即 -Z 方向，经度 90°E
+  // 太阳方向向量: sunDir = (cos(s), sin(s), 0)，其中 s = subsolarLat
+  // 晨昏线上的点满足: dot(position, sunDir) = 0
+  // 
+  // 参数化晨昏线（大圆）：
+  // 晨昏线平面的两个基向量:
+  //   v1 = (-sin(s), cos(s), 0)  - 在x-y平面内，垂直于sunDir
+  //   v2 = (0, 0, 1)             - z轴方向
+  // 
+  // 晨昏线上的点: P(θ) = radius * (cos(θ) * v1 + sin(θ) * v2)
+  //            = radius * (-sin(s)*cos(θ), cos(s)*cos(θ), sin(θ))
+  //
+  // 地球绕Y轴逆时针自转（从北极看），所以：
+  // - z > 0 的半球是"西侧"，即将迎来太阳 → 晨线
+  // - z < 0 的半球是"东侧"，即将告别太阳 → 昏线
+  //
+  // sin(θ) > 0 当 0° < θ < 180°，所以：
+  // - 晨线: θ 从 0° 到 180°（z 从 0 → +radius → 0）
+  // - 昏线: θ 从 180° 到 360°（z 从 0 → -radius → 0）
   
-  // 晨线点：从南极到北极，经过 +Z 方向（西经90°）
-  // 晨昏线需要根据太阳直射点纬度倾斜
+  const subsolarLatRad = subsolarLat * Math.PI / 180;
+  const sinS = Math.sin(subsolarLatRad);
+  const cosS = Math.cos(subsolarLatRad);
+  
+  // 晨线点：θ 从 0° 到 180°（z > 0 的半圆，西侧，即将日出）
   const dawnPoints = useMemo(() => {
     const pts: [number, number, number][] = [];
-    const radius = 2.02;
-    const subsolarLatRad = subsolarLat * Math.PI / 180;
+    const radius = EARTH_RADIUS + 0.02;
     
-    // 晨线在 Y-Z 平面上（x=0, z>0 的半圆），然后根据直射点纬度倾斜
-    for (let i = -90; i <= 90; i += 2) {
-      const latRad = (i * Math.PI) / 180;
+    for (let i = 0; i <= 180; i += 2) {
+      const theta = (i * Math.PI) / 180;
+      const cosTheta = Math.cos(theta);
+      const sinTheta = Math.sin(theta);
       
-      // 基础位置：在 Y-Z 平面的半圆（z > 0）
-      let x = 0;
-      let y = Math.sin(latRad) * radius;
-      let z = Math.cos(latRad) * radius;
-      
-      // 绕 Z 轴旋转（根据太阳直射点纬度倾斜晨昏线）
-      // 当太阳直射北半球时，晨昏线向北极方向倾斜
-      const cosLat = Math.cos(-subsolarLatRad);
-      const sinLat = Math.sin(-subsolarLatRad);
-      const x2 = x * cosLat - y * sinLat;
-      const y2 = x * sinLat + y * cosLat;
-      
-      pts.push([x2, y2, z]);
+      pts.push([
+        -sinS * cosTheta * radius,
+        cosS * cosTheta * radius,
+        sinTheta * radius
+      ]);
     }
     return pts;
-  }, [subsolarLat]);
+  }, [sinS, cosS]);
 
-  // 昏线点：从北极到南极，经过 -Z 方向（东经90°）
+  // 昏线点：θ 从 180° 到 360°（z < 0 的半圆，东侧，即将日落）
   const duskPoints = useMemo(() => {
     const pts: [number, number, number][] = [];
-    const radius = 2.02;
-    const subsolarLatRad = subsolarLat * Math.PI / 180;
+    const radius = EARTH_RADIUS + 0.02;
     
-    // 昏线在 Y-Z 平面上（x=0, z<0 的半圆）
-    for (let i = 90; i >= -90; i -= 2) {
-      const latRad = (i * Math.PI) / 180;
+    for (let i = 180; i <= 360; i += 2) {
+      const theta = (i * Math.PI) / 180;
+      const cosTheta = Math.cos(theta);
+      const sinTheta = Math.sin(theta);
       
-      // 基础位置：在 Y-Z 平面的半圆（z < 0）
-      let x = 0;
-      let y = Math.sin(latRad) * radius;
-      let z = -Math.cos(latRad) * radius;
-      
-      // 绕 Z 轴旋转（根据太阳直射点纬度倾斜晨昏线）
-      const cosLat = Math.cos(-subsolarLatRad);
-      const sinLat = Math.sin(-subsolarLatRad);
-      const x2 = x * cosLat - y * sinLat;
-      const y2 = x * sinLat + y * cosLat;
-      
-      pts.push([x2, y2, z]);
+      pts.push([
+        -sinS * cosTheta * radius,
+        cosS * cosTheta * radius,
+        sinTheta * radius
+      ]);
     }
     return pts;
-  }, [subsolarLat]);
+  }, [sinS, cosS]);
 
-  // 计算晨线和昏线标签位置
-  // 晨线在地球的+Z侧，昏线在-Z侧
+  // 计算晨线和昏线标签位置 - 放在晨昏线与赤道的交点处
+  // 晨昏线参数方程: P(θ) = radius * (-sin(s)*cos(θ), cos(s)*cos(θ), sin(θ))
+  // 赤道交点: y = cos(s)*cos(θ) = 0，即 cos(θ) = 0，θ = 90° 或 270°
+  // θ=90°: P = (0, 0, radius) - 晨线与赤道交点（z > 0，西侧）
+  // θ=270°: P = (0, 0, -radius) - 昏线与赤道交点（z < 0，东侧）
   const dawnPosition = useMemo(() => {
-    const radius = 2.3;
-    const subsolarLatRad = subsolarLat * Math.PI / 180;
-    
-    // 晨线上赤道位置的点：在+Z方向（x=0, y=0, z=radius）
-    // 然后根据太阳直射点纬度倾斜
-    let x = 0;
-    let y = 0;
-    let z = radius;
-    
-    // 绕Z轴倾斜（与晨昏线相同的旋转，注意是负的subsolarLatRad）
-    const cosLat = Math.cos(-subsolarLatRad);
-    const sinLat = Math.sin(-subsolarLatRad);
-    const x2 = x * cosLat - y * sinLat;
-    const y2 = x * sinLat + y * cosLat;
-    
-    return [x2, y2, z] as [number, number, number];
-  }, [subsolarLat]);
+    const radius = EARTH_RADIUS + 0.15;
+    // 晨线与赤道交点 θ=90°，z > 0
+    return [0, 0, radius] as [number, number, number];
+  }, []);
 
   const duskPosition = useMemo(() => {
-    const radius = 2.3;
-    const subsolarLatRad = subsolarLat * Math.PI / 180;
-    
-    // 昏线上赤道位置的点：在-Z方向
-    let x = 0;
-    let y = 0;
-    let z = -radius;
-    
-    const cosLat = Math.cos(-subsolarLatRad);
-    const sinLat = Math.sin(-subsolarLatRad);
-    const x2 = x * cosLat - y * sinLat;
-    const y2 = x * sinLat + y * cosLat;
-    
-    return [x2, y2, z] as [number, number, number];
-  }, [subsolarLat]);
+    const radius = EARTH_RADIUS + 0.15;
+    // 昏线与赤道交点 θ=270°，z < 0
+    return [0, 0, -radius] as [number, number, number];
+  }, []);
 
-  // 检测标签可见性
+  // 计算晨昏线与赤道交点的经度（和 ControlPanel 一致）
+  // UTC 12:00 时正午线在 0° 经度
+  // 每小时正午线向西移动 15°
+  const { dawnLongitude, duskLongitude } = useMemo(() => {
+    const noonLon = ((12 - utcHour) * 15 + 360) % 360;
+    const noonLonDisplay = noonLon > 180 ? noonLon - 360 : noonLon;
+    
+    // 晨线经度 = 正午线 - 90°（西边，地方时 6:00）
+    let dawnLon = (noonLonDisplay - 90 + 360) % 360;
+    if (dawnLon > 180) dawnLon -= 360;
+    
+    // 昏线经度 = 正午线 + 90°（东边，地方时 18:00）
+    let duskLon = (noonLonDisplay + 90 + 360) % 360;
+    if (duskLon > 180) duskLon -= 360;
+    
+    return { dawnLongitude: dawnLon, duskLongitude: duskLon };
+  }, [utcHour]);
+
+  // 检测标签可见性（交点朝向摄像机时才可见）
+  // 需要将本地坐标转换为世界坐标，因为组件可能在旋转的父组中
   useFrame(() => {
     if (groupRef.current) {
-      const dawnWorld = new THREE.Vector3(...dawnPosition);
-      const duskWorld = new THREE.Vector3(...duskPosition);
+      // 获取本地坐标点
+      const dawnLocal = new THREE.Vector3(...dawnPosition);
+      const duskLocal = new THREE.Vector3(...duskPosition);
       
-      const dawnNormal = dawnWorld.clone().normalize();
-      const duskNormal = duskWorld.clone().normalize();
+      // 转换为世界坐标
+      const dawnWorld = groupRef.current.localToWorld(dawnLocal.clone());
+      const duskWorld = groupRef.current.localToWorld(duskLocal.clone());
+      
+      // 世界坐标系下的法向量（从地球中心指向表面点）
+      const earthCenter = new THREE.Vector3(0, 0, 0);
+      groupRef.current.localToWorld(earthCenter);
+      
+      const dawnNormal = dawnWorld.clone().sub(earthCenter).normalize();
+      const duskNormal = duskWorld.clone().sub(earthCenter).normalize();
       
       const toCamera = camera.position.clone().normalize();
       
@@ -374,6 +614,15 @@ function TerminatorLine({
       setDuskVisible(duskNormal.dot(toCamera) > 0.1);
     }
   });
+
+  // 格式化经度显示
+  const formatLongitude = (lon: number) => {
+    const absLon = Math.abs(lon);
+    const deg = Math.floor(absLon);
+    const min = Math.round((absLon - deg) * 60);
+    const dir = lon >= 0 ? 'E' : 'W';
+    return `${deg}°${min > 0 ? min + "'" : ''} ${dir}`;
+  };
 
   return (
     <group ref={groupRef}>
@@ -394,7 +643,7 @@ function TerminatorLine({
         />
       )}
       
-      {/* 晨线标签 */}
+      {/* 晨线标签 - 在赤道交点处，可见时才显示 */}
       {showLabels && showDawn && dawnVisible && (
         <group position={dawnPosition}>
           <Html center zIndexRange={[100, 0]}>
@@ -407,13 +656,13 @@ function TerminatorLine({
               fontWeight: 600,
               whiteSpace: 'nowrap',
             }}>
-              🌅 晨线 6:00
+              🌅 晨线 6:00 {formatLongitude(dawnLongitude)}
             </div>
           </Html>
         </group>
       )}
       
-      {/* 昏线标签 */}
+      {/* 昏线标签 - 在赤道交点处，可见时才显示 */}
       {showLabels && showDusk && duskVisible && (
         <group position={duskPosition}>
           <Html center zIndexRange={[100, 0]}>
@@ -426,7 +675,7 @@ function TerminatorLine({
               fontWeight: 600,
               whiteSpace: 'nowrap',
             }}>
-              🌆 昏线 18:00
+              🌆 昏线 18:00 {formatLongitude(duskLongitude)}
             </div>
           </Html>
         </group>
@@ -439,9 +688,11 @@ function TerminatorLine({
 function NoonLine({ 
   subsolarLat,
   showLabel,
+  utcHour,
 }: { 
   subsolarLat: number;
   showLabel: boolean;
+  utcHour: number;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [isVisible, setIsVisible] = useState(true);
@@ -452,7 +703,7 @@ function NoonLine({
   // 注意：正午线相对太阳固定，随地球自转，对应的地球经度会变化
   const points = useMemo(() => {
     const pts: [number, number, number][] = [];
-    const radius = 2.02;
+    const radius = EARTH_RADIUS + 0.02;
     
     for (let lat = -90; lat <= 90; lat += 2) {
       const latRad = (lat * Math.PI) / 180;
@@ -465,20 +716,9 @@ function NoonLine({
     return pts;
   }, []);
 
-  // 太阳直射点位置 - 在正午线上
-  const subsolarPosition: [number, number, number] = useMemo(() => {
-    const radius = 2.15;
-    const latRad = subsolarLat * Math.PI / 180;
-    return [
-      Math.cos(latRad) * radius,
-      Math.sin(latRad) * radius,
-      0
-    ];
-  }, [subsolarLat]);
-
   // 直射点标签位置 - 稍微偏移到Z轴负方向，避免和纬线标签重叠
   const subsolarLabelPosition: [number, number, number] = useMemo(() => {
-    const radius = 2.15;
+    const radius = EARTH_RADIUS + 0.15;
     const latRad = subsolarLat * Math.PI / 180;
     const zOffset = -0.8; // Z轴偏移
     return [
@@ -488,12 +728,37 @@ function NoonLine({
     ];
   }, [subsolarLat]);
 
-  // 检测可见性
+  // 计算正午线经度（和 ControlPanel 一致）
+  // UTC 12:00 时正午线在 0° 经度
+  // 每小时正午线向西移动 15°
+  const noonLongitude = useMemo(() => {
+    const noonLon = ((12 - utcHour) * 15 + 360) % 360;
+    return noonLon > 180 ? noonLon - 360 : noonLon;
+  }, [utcHour]);
+
+  // 格式化经度显示
+  const formatLongitude = (lon: number) => {
+    const absLon = Math.abs(lon);
+    const deg = Math.floor(absLon);
+    const min = Math.round((absLon - deg) * 60);
+    const dir = lon >= 0 ? 'E' : 'W';
+    return `${deg}°${min > 0 ? min + "'" : ''} ${dir}`;
+  };
+
+  // 检测可见性（需要考虑父组件旋转）
   useFrame(() => {
     if (groupRef.current) {
-      const worldPos = new THREE.Vector3(...subsolarPosition);
-      const normal = worldPos.clone().normalize();
-      const toCamera = camera.position.clone().sub(worldPos).normalize();
+      // 获取本地坐标点并转换为世界坐标
+      const localPos = new THREE.Vector3(...subsolarLabelPosition);
+      const worldPos = groupRef.current.localToWorld(localPos.clone());
+      
+      // 获取地球中心的世界坐标
+      const earthCenter = new THREE.Vector3(0, 0, 0);
+      groupRef.current.localToWorld(earthCenter);
+      
+      // 世界坐标系下的法向量
+      const normal = worldPos.clone().sub(earthCenter).normalize();
+      const toCamera = camera.position.clone().normalize();
       setIsVisible(normal.dot(toCamera) > 0.1);
     }
   });
@@ -523,11 +788,12 @@ function NoonLine({
               fontWeight: 600,
               whiteSpace: 'nowrap',
             }}>
-              ☀️ 太阳直射点 12:00
+              ☀️ 太阳直射点 12:00 {formatLongitude(noonLongitude)}
             </div>
           </Html>
         </group>
       )}
+
     </group>
   );
 }
@@ -597,8 +863,79 @@ function DayNightShading({ subsolarLat }: { subsolarLat: number }) {
 
   return (
     <mesh ref={nightRef} material={nightMaterial}>
-      <sphereGeometry args={[2.015, 64, 64]} />
+      <sphereGeometry args={[EARTH_RADIUS + 0.015, 64, 64]} />
     </mesh>
+  );
+}
+
+/** 城市标记组件 */
+function CityMarker({ city, radius }: { city: CityInfo; radius: number }) {
+  const { camera } = useThree();
+  const [isVisible, setIsVisible] = useState(true);
+  const groupRef = useRef<THREE.Group>(null);
+  
+  // 将经纬度转换为3D坐标
+  const latRad = city.lat * Math.PI / 180;
+  const lonRad = city.lon * Math.PI / 180;
+  const markerRadius = radius + 0.05;
+  
+  const position = useMemo(() => new THREE.Vector3(
+    markerRadius * Math.cos(latRad) * Math.cos(lonRad),
+    markerRadius * Math.sin(latRad),
+    -markerRadius * Math.cos(latRad) * Math.sin(lonRad)
+  ), [latRad, lonRad, markerRadius]);
+  
+  // 实时检测标记是否面向相机（考虑父组件的旋转）
+  useFrame(() => {
+    if (groupRef.current) {
+      // 获取标记在世界坐标中的实际位置
+      const worldPos = new THREE.Vector3();
+      groupRef.current.getWorldPosition(worldPos);
+      
+      // 世界坐标中的法向量
+      const normal = worldPos.clone().normalize();
+      const toCamera = camera.position.clone().sub(worldPos).normalize();
+      setIsVisible(normal.dot(toCamera) > 0.1);
+    }
+  });
+  
+  // 始终渲染 group 以便获取世界位置，只控制内容可见性
+  return (
+    <group ref={groupRef} position={position}>
+      {isVisible && (
+        <>
+          {/* 标记点 */}
+          <mesh>
+            <sphereGeometry args={[0.1, 16, 16]} />
+            <meshBasicMaterial color="#EF4444" />
+          </mesh>
+          {/* 标记环 */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.12, 0.16, 32]} />
+            <meshBasicMaterial color="#EF4444" side={THREE.DoubleSide} transparent opacity={0.8} />
+          </mesh>
+          {/* 城市名称标签 */}
+          <Html
+            center
+            style={{
+              color: 'white',
+              background: 'rgba(239, 68, 68, 0.9)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              transform: 'translateY(-24px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}
+          >
+            📍 {city.name}
+          </Html>
+        </>
+      )}
+    </group>
   );
 }
 
@@ -612,6 +949,8 @@ function Earth({
   showShading,
   viewMode,
   rotationAngle,
+  utcHour,
+  selectedCity,
 }: {
   showLabels: boolean;
   subsolarLat: number;
@@ -621,6 +960,8 @@ function Earth({
   showShading: boolean;
   viewMode: 'sun' | 'earth';
   rotationAngle: number;
+  utcHour: number;
+  selectedCity: CityInfo | null;
 }) {
   const earthGroupRef = useRef<THREE.Group>(null);
   const sunRelativeGroupRef = useRef<THREE.Group>(null);
@@ -659,7 +1000,7 @@ function Earth({
       <group ref={earthGroupRef}>
         {/* 地球主体 */}
         <mesh>
-          <sphereGeometry args={[2, 64, 64]} />
+          <sphereGeometry args={[EARTH_RADIUS, 64, 64]} />
           <meshStandardMaterial
             map={earthMap}
             normalMap={earthNormal}
@@ -668,17 +1009,17 @@ function Earth({
             roughness={0.3}
             metalness={0.0}
             emissive="#4a6080"
-            emissiveIntensity={0.2}
+            emissiveIntensity={0.35}
           />
         </mesh>
         
         {/* 云层 */}
         <mesh>
-          <sphereGeometry args={[2.02, 64, 64]} />
+          <sphereGeometry args={[EARTH_RADIUS + 0.02, 64, 64]} />
           <meshBasicMaterial
             map={cloudsMap}
             transparent
-            opacity={0.15}
+            opacity={0.08}
             depthWrite={false}
           />
         </mesh>
@@ -688,12 +1029,18 @@ function Earth({
           <LatitudeLine 
             key={name}
             latitude={lat} 
-            radius={2.01} 
+            radius={EARTH_RADIUS + 0.01} 
             color={color} 
             label={`${name} ${formatDegreeMinute(lat, false)}`}
             showLabel={showLabels && Math.abs(lat) > 0}
           />
         ))}
+
+        {/* 经纬网格 */}
+        <Graticule radius={EARTH_RADIUS + 0.005} />
+
+        {/* 城市标记 */}
+        {selectedCity && <CityMarker city={selectedCity} radius={EARTH_RADIUS} />}
       </group>
 
       {/* 太阳相对组 - 在地球视角下旋转 */}
@@ -708,6 +1055,7 @@ function Earth({
             showLabels={showLabels}
             showDawn={showDawnLine}
             showDusk={showDuskLine}
+            utcHour={utcHour}
           />
         )}
 
@@ -716,6 +1064,7 @@ function Earth({
           <NoonLine 
             subsolarLat={subsolarLat}
             showLabel={showLabels}
+            utcHour={utcHour}
           />
         )}
       </group>
@@ -726,7 +1075,6 @@ function Earth({
 /** 场景组件 */
 interface SceneProps {
   showLabels: boolean;
-  autoRotate: boolean;
   subsolarLat: number;
   showDawnLine: boolean;
   showDuskLine: boolean;
@@ -736,11 +1084,12 @@ interface SceneProps {
   showSunRays: boolean;
   viewMode: 'sun' | 'earth';
   cameraRef: React.RefObject<CameraControllerHandle>;
+  utcHour: number;
+  selectedCity: CityInfo | null;
 }
 
 function Scene({ 
   showLabels, 
-  autoRotate,
   subsolarLat,
   showDawnLine,
   showDuskLine,
@@ -750,22 +1099,24 @@ function Scene({
   showSunRays,
   viewMode,
   cameraRef,
+  utcHour,
+  selectedCity,
 }: SceneProps) {
   const sunGroupRef = useRef<THREE.Group>(null);
-  const [rotationAngle, setRotationAngle] = useState(0);
+  
+  // 根据 UTC 时间计算地球的旋转角度
+  // UTC 12:00 时，0° 经度正对太阳（正午线在 0° 经度）
+  // UTC 时间每增加 1 小时，地球向东转 15°
+  const rotationAngle = useMemo(() => {
+    return (utcHour - 12) * 15 * Math.PI / 180;
+  }, [utcHour]);
 
-  // 处理自转动画
-  useFrame(({ clock }) => {
-    if (autoRotate) {
-      const angle = clock.elapsedTime * 0.1;
-      setRotationAngle(angle);
-      
-      // 地球视角下，太阳也要跟着转
-      if (viewMode === 'earth' && sunGroupRef.current) {
-        sunGroupRef.current.rotation.y = -angle;
-      } else if (sunGroupRef.current) {
-        sunGroupRef.current.rotation.y = 0;
-      }
+  // 处理太阳组的旋转（地球视角下太阳需要转）
+  useFrame(() => {
+    if (viewMode === 'earth' && sunGroupRef.current) {
+      sunGroupRef.current.rotation.y = -rotationAngle;
+    } else if (sunGroupRef.current) {
+      sunGroupRef.current.rotation.y = 0;
     }
   });
 
@@ -790,7 +1141,9 @@ function Scene({
           showNoonLine={showNoonLine}
           showShading={showShading}
           viewMode={viewMode}
-          rotationAngle={autoRotate ? rotationAngle : 0}
+          rotationAngle={rotationAngle}
+          utcHour={utcHour}
+          selectedCity={selectedCity}
         />
       </Suspense>
       
@@ -925,103 +1278,6 @@ function TwoDView({
   );
 }
 
-// ===================== 昼长计算器 =====================
-
-function DayLengthCalculator({
-  subsolarLat,
-}: {
-  subsolarLat: number;
-}) {
-  const [selectedLat, setSelectedLat] = useState(39.9); // 默认北京纬度
-
-  const dayLength = getDayLength(selectedLat, subsolarLat);
-  const nightLength = 24 - dayLength;
-
-  return (
-    <div style={{
-      background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-    }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-        <SunIcon fontSize="small" /> 昼夜长短计算器
-      </Typography>
-
-      {/* 纬度选择 */}
-      <div style={{ marginBottom: 12 }}>
-        <Typography variant="caption" color="text.secondary">选择纬度</Typography>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
-          {[
-            { name: '北京', lat: 39.9 },
-            { name: '上海', lat: 31.2 },
-            { name: '广州', lat: 23.1 },
-            { name: '哈尔滨', lat: 45.8 },
-            { name: '赤道', lat: 0 },
-            { name: '北回归线', lat: OBLIQUITY },
-            { name: '北极圈', lat: ARCTIC_CIRCLE_LAT },
-          ].map(({ name, lat }) => (
-            <Chip
-              key={name}
-              label={`${name} ${formatDegreeMinute(lat, false)}`}
-              size="small"
-              onClick={() => setSelectedLat(lat)}
-              sx={{
-                background: Math.abs(selectedLat - lat) < 0.1
-                  ? 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)' 
-                  : 'rgba(245, 158, 11, 0.1)',
-                color: Math.abs(selectedLat - lat) < 0.1 ? 'white' : '#F59E0B',
-                fontWeight: Math.abs(selectedLat - lat) < 0.1 ? 600 : 400,
-                fontSize: 10,
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* 自定义纬度 */}
-      <div style={{ marginBottom: 12 }}>
-        <Typography variant="caption" color="text.secondary">
-          自定义纬度: {selectedLat.toFixed(1)}°{selectedLat >= 0 ? 'N' : 'S'}
-        </Typography>
-        <Slider
-          value={selectedLat}
-          onChange={(_, v) => setSelectedLat(v as number)}
-          min={-90}
-          max={90}
-          step={0.1}
-          sx={{ color: '#F59E0B' }}
-        />
-      </div>
-
-      {/* 结果显示 */}
-      <div style={{
-        background: 'white',
-        borderRadius: 8,
-        padding: 12,
-        display: 'flex',
-        justifyContent: 'space-around',
-        alignItems: 'center',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <SunIcon sx={{ color: '#F59E0B', fontSize: 28 }} />
-          <Typography variant="body2" color="text.secondary">昼长</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#F59E0B' }}>
-            {formatDayLength(dayLength)}
-          </Typography>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <MoonIcon sx={{ color: '#8B5CF6', fontSize: 28 }} />
-          <Typography variant="body2" color="text.secondary">夜长</Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#8B5CF6' }}>
-            {formatDayLength(nightLength)}
-          </Typography>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ===================== 控制面板 =====================
 
 interface ControlPanelProps {
@@ -1029,6 +1285,10 @@ interface ControlPanelProps {
   setDayOfYear: (day: number) => void;
   initialDayOfYear: number;
   subsolarLat: number;
+  utcHour: number;
+  setUtcHour: (hour: number) => void;
+  selectedCity: CityInfo | null;
+  setSelectedCity: (city: CityInfo | null) => void;
   showDawnLine: boolean;
   setShowDawnLine: (show: boolean) => void;
   showDuskLine: boolean;
@@ -1050,6 +1310,10 @@ function ControlPanel({
   setDayOfYear,
   initialDayOfYear,
   subsolarLat,
+  utcHour,
+  setUtcHour,
+  selectedCity,
+  setSelectedCity,
   showDawnLine,
   setShowDawnLine,
   showDuskLine,
@@ -1065,6 +1329,27 @@ function ControlPanel({
   viewMode,
   setViewMode,
 }: ControlPanelProps) {
+  const [citySearch, setCitySearch] = useState('');
+
+  // 计算选中城市的信息
+  const cityInfo = useMemo(() => {
+    if (!selectedCity) return null;
+    const localTime = getLocalTime(utcHour, selectedCity.lon);
+    const dayLength = getDayLength(selectedCity.lat, subsolarLat);
+    const sunTimes = getSunriseSunset(selectedCity.lat, subsolarLat);
+    const isDay = isDaytime(localTime, selectedCity.lat, subsolarLat);
+    return { localTime, dayLength, sunTimes, isDay };
+  }, [selectedCity, utcHour, subsolarLat]);
+
+  // 正午线经度（UTC时间对应的太阳直射经度）
+  const noonLongitude = useMemo(() => {
+    // UTC 12:00 时正午线在 0° 经度
+    // 每小时正午线向西移动 15°
+    return ((12 - utcHour) * 15 + 360) % 360;
+  }, [utcHour]);
+
+  // 转换为 -180 到 180 的范围
+  const noonLonDisplay = noonLongitude > 180 ? noonLongitude - 360 : noonLongitude;
 
   return (
     <Card sx={{ 
@@ -1115,10 +1400,32 @@ function ControlPanel({
           </Typography>
         </div>
 
-        {/* 日期选择 */}
-        <div style={{ marginBottom: 16 }}>
+        {/* 第一步：日期 → 太阳直射点纬度 */}
+        <div style={{ 
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%)',
+          borderRadius: 12,
+          padding: 12,
+          border: '1px solid rgba(251, 191, 36, 0.2)',
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#F59E0B', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span style={{ 
+              background: '#F59E0B', 
+              color: 'white', 
+              borderRadius: '50%', 
+              width: 20, 
+              height: 20, 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700
+            }}>1</span>
+            日期 → 太阳直射点纬度
+          </Typography>
+          
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#F59E0B' }}>
+            <Typography variant="caption" color="text.secondary">
               🗓️ {dayOfYearToDate(dayOfYear)}（第 {dayOfYear} 天）
             </Typography>
             {dayOfYear !== initialDayOfYear && (
@@ -1131,7 +1438,6 @@ function ControlPanel({
                   color: '#6366F1',
                   fontSize: 10,
                   height: 20,
-                  '&:hover': { background: 'rgba(99, 102, 241, 0.2)' },
                 }}
               />
             )}
@@ -1145,7 +1451,7 @@ function ControlPanel({
           />
           
           {/* 快速选择特殊日期 */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
             {SPECIAL_DATES.map(({ name, dayOfYear: day }) => (
               <Chip
                 key={name}
@@ -1158,31 +1464,208 @@ function ControlPanel({
                     : 'rgba(245, 158, 11, 0.1)',
                   color: Math.abs(dayOfYear - day) < 5 ? 'white' : '#F59E0B',
                   fontWeight: Math.abs(dayOfYear - day) < 5 ? 600 : 400,
+                  fontSize: 11,
                 }}
               />
             ))}
           </div>
-        </div>
 
-        {/* 太阳直射点信息 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(239, 68, 68, 0.1) 100%)',
-          borderRadius: 8,
-          padding: 12,
-          marginBottom: 16,
-        }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-            ☀️ 太阳直射点位置
-          </Typography>
-          <div style={{ textAlign: 'center' }}>
-            <Typography variant="caption" color="text.secondary">直射点纬度</Typography>
+          {/* 结果：太阳直射点 */}
+          <div style={{
+            marginTop: 12,
+            background: 'white',
+            borderRadius: 8,
+            padding: 8,
+            textAlign: 'center',
+          }}>
+            <Typography variant="caption" color="text.secondary">☀️ 太阳直射点纬度</Typography>
             <Typography variant="h5" sx={{ fontWeight: 700, color: '#F59E0B', lineHeight: 1.2 }}>
               {formatDegreeMinute(subsolarLat)}
             </Typography>
           </div>
-          <Typography variant="caption" sx={{ color: '#666', display: 'block', mt: 1, fontSize: '10px' }}>
-            💡 正午线（红色虚线）上所有点的地方时都是 12:00，晨线上是 6:00，昏线上是 18:00
+        </div>
+
+        {/* 第二步：时间 → 正午线经度 */}
+        <div style={{ 
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          borderRadius: 12,
+          padding: 12,
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#3B82F6', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span style={{ 
+              background: '#3B82F6', 
+              color: 'white', 
+              borderRadius: '50%', 
+              width: 20, 
+              height: 20, 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700
+            }}>2</span>
+            时间 (UTC) → 正午线位置
           </Typography>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 80 }}>
+              UTC {utcHour.toString().padStart(2, '0')}:00
+            </Typography>
+            <Slider
+              value={utcHour}
+              onChange={(_, v) => setUtcHour(v as number)}
+              min={0}
+              max={23}
+              step={1}
+              marks={[
+                { value: 0, label: '0' },
+                { value: 6, label: '6' },
+                { value: 12, label: '12' },
+                { value: 18, label: '18' },
+                { value: 23, label: '23' },
+              ]}
+              sx={{ color: '#3B82F6', flex: 1 }}
+            />
+          </div>
+
+          {/* 结果：正午线位置 */}
+          <div style={{
+            background: 'white',
+            borderRadius: 8,
+            padding: 8,
+            display: 'flex',
+            justifyContent: 'space-around',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">🕐 正午线</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#EF4444' }}>
+                {Math.abs(noonLonDisplay).toFixed(0)}°{noonLonDisplay >= 0 ? 'E' : 'W'}
+              </Typography>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">🌅 晨线</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#10B981' }}>
+                {Math.abs((noonLonDisplay - 90 + 360) % 360 > 180 ? (noonLonDisplay - 90 + 360) % 360 - 360 : (noonLonDisplay - 90 + 360) % 360).toFixed(0)}°
+                {((noonLonDisplay - 90 + 360) % 360 > 180 ? (noonLonDisplay - 90 + 360) % 360 - 360 : (noonLonDisplay - 90 + 360) % 360) >= 0 ? 'E' : 'W'}
+              </Typography>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">🌆 昏线</Typography>
+              <Typography variant="body1" sx={{ fontWeight: 700, color: '#8B5CF6' }}>
+                {Math.abs((noonLonDisplay + 90 + 360) % 360 > 180 ? (noonLonDisplay + 90 + 360) % 360 - 360 : (noonLonDisplay + 90 + 360) % 360).toFixed(0)}°
+                {((noonLonDisplay + 90 + 360) % 360 > 180 ? (noonLonDisplay + 90 + 360) % 360 - 360 : (noonLonDisplay + 90 + 360) % 360) >= 0 ? 'E' : 'W'}
+              </Typography>
+            </div>
+          </div>
+        </div>
+
+        {/* 第三步：位置（城市） → 当地昼夜状态 */}
+        <div style={{ 
+          marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%)',
+          borderRadius: 12,
+          padding: 12,
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#10B981', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <span style={{ 
+              background: '#10B981', 
+              color: 'white', 
+              borderRadius: '50%', 
+              width: 20, 
+              height: 20, 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700
+            }}>3</span>
+            位置 → 当地昼夜状态
+          </Typography>
+
+          {/* 城市搜索 */}
+          <input
+            type="text"
+            placeholder="🔍 搜索城市..."
+            value={citySearch}
+            onChange={(e) => setCitySearch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid #E5E7EB',
+              marginBottom: 8,
+              fontSize: 14,
+              outline: 'none',
+            }}
+          />
+
+          {/* 城市列表 */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+            {FAMOUS_CITIES
+              .filter(city => citySearch === '' || city.name.includes(citySearch))
+              .map((city) => (
+                <Chip
+                  key={city.name}
+                  label={city.name}
+                  size="small"
+                  onClick={() => setSelectedCity(city)}
+                  sx={{
+                    background: selectedCity?.name === city.name
+                      ? 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)' 
+                      : 'rgba(16, 185, 129, 0.1)',
+                    color: selectedCity?.name === city.name ? 'white' : '#10B981',
+                    fontWeight: selectedCity?.name === city.name ? 600 : 400,
+                    fontSize: 11,
+                  }}
+                />
+              ))}
+          </div>
+
+          {/* 选中城市的信息 */}
+          {selectedCity && cityInfo && (
+            <div style={{
+              background: 'white',
+              borderRadius: 8,
+              padding: 12,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                  📍 {selectedCity.name}
+                </Typography>
+                <div style={{
+                  background: cityInfo.isDay 
+                    ? 'linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%)' 
+                    : 'linear-gradient(135deg, #1E3A5A 0%, #312E81 100%)',
+                  color: 'white',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}>
+                  {cityInfo.isDay ? '☀️ 白天' : '🌙 黑夜'}
+                </div>
+              </div>
+              
+              <div style={{ fontSize: 12, color: '#666' }}>
+                <div>经度：{selectedCity.lon.toFixed(1)}°{selectedCity.lon >= 0 ? 'E' : 'W'} | 纬度：{selectedCity.lat.toFixed(1)}°{selectedCity.lat >= 0 ? 'N' : 'S'}</div>
+                <div style={{ marginTop: 4 }}>
+                  <b style={{ color: '#3B82F6' }}>当地时间：{formatTime(cityInfo.localTime)}</b>
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  昼长：<b style={{ color: '#F59E0B' }}>{formatDayLength(cityInfo.dayLength)}</b>
+                </div>
+                {cityInfo.sunTimes && (
+                  <div style={{ marginTop: 4 }}>
+                    日出 <b style={{ color: '#10B981' }}>{formatTime(cityInfo.sunTimes.sunrise)}</b> | 
+                    日落 <b style={{ color: '#8B5CF6' }}>{formatTime(cityInfo.sunTimes.sunset)}</b>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 显示选项 */}
@@ -1247,82 +1730,6 @@ function ControlPanel({
             />
           </div>
         </div>
-
-        {/* 昼长计算器 */}
-        <DayLengthCalculator subsolarLat={subsolarLat} />
-
-        {/* 知识点介绍 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
-          borderRadius: 12,
-          padding: 16,
-          marginTop: 16,
-        }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#6366F1', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            📚 高考知识点
-          </Typography>
-          
-          <Typography variant="body2" component="div" sx={{ lineHeight: 1.9, fontSize: '12px' }}>
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#F59E0B' }}>1. 晨昏线 ⭐⭐⭐</b><br/>
-              • <span style={{ color: '#10B981' }}>晨线</span>：夜→昼的分界线（日出线）<br/>
-              • <span style={{ color: '#8B5CF6' }}>昏线</span>：昼→夜的分界线（日落线）<br/>
-              • 晨昏线是过地心的大圆，始终<b>垂直于太阳光线</b>
-            </div>
-
-            <div style={{ marginBottom: 12, background: 'rgba(239, 68, 68, 0.08)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-              <b style={{ color: '#EF4444' }}>2. 正午线与地方时 ⭐⭐⭐</b><br/>
-              • <span style={{ color: '#EF4444' }}>正午线</span>：太阳直射的<b>经线</b>，地方时 <b>12:00</b><br/>
-              • 午夜线：正午线对面180°，地方时 <b>0:00</b><br/>
-              • <span style={{ color: '#10B981' }}>晨线</span>：地方时 <b>6:00</b>（比正午线西90°）<br/>
-              • <span style={{ color: '#8B5CF6' }}>昏线</span>：地方时 <b>18:00</b>（比正午线东90°）<br/>
-            </div>
-
-            <div style={{ marginBottom: 12, background: 'rgba(139, 92, 246, 0.08)', padding: '8px', borderRadius: '6px', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-              <b style={{ color: '#8B5CF6' }}>3. 两种观察视角 👁️</b><br/>
-              • <b>☀️ 太阳视角</b>：太阳固定，地球自转<br/>
-              　→ 晨线、昏线、正午线<b>固定不动</b><br/>
-              　→ 观察地表如何依次经过晨线→正午线→昏线<br/>
-              • <b>🌍 地球视角</b>：地球固定，太阳移动<br/>
-              　→ 晨线、昏线、正午线<b>绕地球转动</b><br/>
-              　→ 观察某地一天中太阳位置的变化
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#06B6D4' }}>4. 地方时计算 ⭐⭐⭐</b><br/>
-              • 地方时由<b>经度</b>决定，同一经线地方时相同<br/>
-              • 经度每差<b>15°</b>，时间差<b>1小时</b><br/>
-              • 经度每差<b>1°</b>，时间差<b>4分钟</b><br/>
-              • <b>东加西减</b>：东边时间早，西边时间晚<br/>
-              <div style={{ fontSize: '11px', marginTop: '4px', color: '#666' }}>
-                公式：所求地方时 = 已知地方时 ± 经度差×4分钟
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#3B82F6' }}>5. 太阳直射点移动 ⭐⭐</b><br/>
-              • 春分→夏至：向<b>北</b>移<br/>
-              • 夏至→秋分：向<b>南</b>移<br/>
-              • 秋分→冬至：向<b>南</b>移<br/>
-              • 冬至→春分：向<b>北</b>移
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <b style={{ color: '#10B981' }}>6. 昼夜长短规律 ⭐⭐⭐</b><br/>
-              • 直射点所在半球：<b>昼长夜短</b><br/>
-              • 纬度越高变化越大<br/>
-              • 赤道终年昼夜平分（12小时）<br/>
-              • 极圈内有极昼极夜现象
-            </div>
-            
-            <div>
-              <b style={{ color: '#F59E0B' }}>7. 特殊日期 ⭐⭐</b><br/>
-              • 春/秋分：全球昼夜平分，晨昏线过两极<br/>
-              • 夏至：北半球昼最长，北极圈内极昼<br/>
-              • 冬至：北半球夜最长，北极圈内极夜
-            </div>
-          </Typography>
-        </div>
       </CardContent>
     </Card>
   );
@@ -1335,6 +1742,12 @@ interface MobileControlPanelProps {
   setDayOfYear: (day: number) => void;
   initialDayOfYear: number;
   subsolarLat: number;
+  utcHour: number;
+  setUtcHour: (hour: number) => void;
+  viewMode: 'sun' | 'earth';
+  setViewMode: (mode: 'sun' | 'earth') => void;
+  selectedCity: CityInfo | null;
+  setSelectedCity: (city: CityInfo | null) => void;
 }
 
 function MobileControlPanel({
@@ -1342,8 +1755,23 @@ function MobileControlPanel({
   setDayOfYear,
   initialDayOfYear,
   subsolarLat,
+  utcHour,
+  setUtcHour,
+  viewMode,
+  setViewMode,
+  selectedCity,
+  setSelectedCity,
 }: MobileControlPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // 计算选中城市的信息
+  const cityInfo = useMemo(() => {
+    if (!selectedCity) return null;
+    const localTime = getLocalTime(utcHour, selectedCity.lon);
+    const dayLength = getDayLength(selectedCity.lat, subsolarLat);
+    const isDay = isDaytime(localTime, selectedCity.lat, subsolarLat);
+    return { localTime, dayLength, isDay };
+  }, [selectedCity, utcHour, subsolarLat]);
 
   return (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100 }}>
@@ -1390,11 +1818,51 @@ function MobileControlPanel({
               boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
             }}
           >
-            <div style={{ padding: 16, maxHeight: '50vh', overflowY: 'auto' }}>
+            <div style={{ padding: 16, maxHeight: '60vh', overflowY: 'auto' }}>
+              {/* 视角模式选择 */}
+              <div style={{ marginBottom: 12 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#8B5CF6', mb: 0.5, display: 'block' }}>
+                  👁️ 观察视角
+                </Typography>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Chip
+                    icon={<SunIcon sx={{ fontSize: 14 }} />}
+                    label="太阳视角"
+                    size="small"
+                    onClick={() => setViewMode('sun')}
+                    sx={{
+                      flex: 1,
+                      background: viewMode === 'sun' 
+                        ? 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)' 
+                        : 'rgba(245, 158, 11, 0.1)',
+                      color: viewMode === 'sun' ? 'white' : '#F59E0B',
+                      fontWeight: viewMode === 'sun' ? 600 : 400,
+                      fontSize: 11,
+                      '& .MuiChip-icon': { color: viewMode === 'sun' ? 'white' : '#F59E0B' },
+                    }}
+                  />
+                  <Chip
+                    icon={<span style={{ fontSize: 12 }}>🌍</span>}
+                    label="地球视角"
+                    size="small"
+                    onClick={() => setViewMode('earth')}
+                    sx={{
+                      flex: 1,
+                      background: viewMode === 'earth' 
+                        ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)' 
+                        : 'rgba(59, 130, 246, 0.1)',
+                      color: viewMode === 'earth' ? 'white' : '#3B82F6',
+                      fontWeight: viewMode === 'earth' ? 600 : 400,
+                      fontSize: 11,
+                    }}
+                  />
+                </div>
+              </div>
+
               {/* 太阳直射点 */}
-              <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <Typography variant="caption" color="text.secondary">太阳直射点纬度</Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#F59E0B' }}>
+              <div style={{ textAlign: 'center', marginBottom: 12, background: 'rgba(251, 191, 36, 0.1)', padding: 8, borderRadius: 8 }}>
+                <Typography variant="caption" color="text.secondary">☀️ 太阳直射点纬度</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#F59E0B', lineHeight: 1.2 }}>
                   {formatDegreeMinute(subsolarLat)}
                 </Typography>
               </div>
@@ -1403,7 +1871,7 @@ function MobileControlPanel({
               <div style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Typography variant="caption" color="text.secondary">
-                    日期：{dayOfYearToDate(dayOfYear)}（第 {dayOfYear} 天）
+                    🗓️ {dayOfYearToDate(dayOfYear)}（第 {dayOfYear} 天）
                   </Typography>
                   {dayOfYear !== initialDayOfYear && (
                     <Chip
@@ -1429,7 +1897,7 @@ function MobileControlPanel({
               </div>
 
               {/* 特殊日期 */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
                 {SPECIAL_DATES.map(({ name, dayOfYear: day }) => (
                   <Chip
                     key={name}
@@ -1442,10 +1910,85 @@ function MobileControlPanel({
                         : 'rgba(245, 158, 11, 0.1)',
                       color: Math.abs(dayOfYear - day) < 5 ? 'white' : '#F59E0B',
                       fontWeight: Math.abs(dayOfYear - day) < 5 ? 600 : 400,
+                      fontSize: 11,
                     }}
                   />
                 ))}
               </div>
+
+              {/* UTC 时间滑块 */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    🕐 UTC {utcHour.toString().padStart(2, '0')}:00
+                  </Typography>
+                </div>
+                <Slider
+                  value={utcHour}
+                  onChange={(_, v) => setUtcHour(v as number)}
+                  min={0}
+                  max={23}
+                  step={1}
+                  marks={[
+                    { value: 0, label: '0' },
+                    { value: 12, label: '12' },
+                    { value: 23, label: '23' },
+                  ]}
+                  sx={{ color: '#3B82F6' }}
+                />
+              </div>
+
+              {/* 城市选择 */}
+              <div style={{ marginBottom: 8 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#10B981', mb: 0.5, display: 'block' }}>
+                  📍 选择城市
+                </Typography>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {FAMOUS_CITIES.slice(0, 6).map((city) => (
+                    <Chip
+                      key={city.name}
+                      label={city.name}
+                      size="small"
+                      onClick={() => setSelectedCity(city)}
+                      sx={{
+                        background: selectedCity?.name === city.name
+                          ? 'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)' 
+                          : 'rgba(16, 185, 129, 0.1)',
+                        color: selectedCity?.name === city.name ? 'white' : '#10B981',
+                        fontWeight: selectedCity?.name === city.name ? 600 : 400,
+                        fontSize: 10,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* 选中城市的信息 */}
+              {selectedCity && cityInfo && (
+                <div style={{
+                  background: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: 8,
+                  padding: 8,
+                  fontSize: 11,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>{selectedCity.name}</span>
+                    <span style={{
+                      background: cityInfo.isDay ? '#F59E0B' : '#1E3A5A',
+                      color: 'white',
+                      padding: '1px 6px',
+                      borderRadius: 8,
+                      fontSize: 10,
+                    }}>
+                      {cityInfo.isDay ? '☀️ 白天' : '🌙 黑夜'}
+                    </span>
+                  </div>
+                  <div style={{ color: '#666', marginTop: 4 }}>
+                    当地时间：<b style={{ color: '#3B82F6' }}>{formatTime(cityInfo.localTime)}</b> | 
+                    昼长：<b style={{ color: '#F59E0B' }}>{formatDayLength(cityInfo.dayLength)}</b>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -1477,11 +2020,41 @@ export default function DayNightDemo3D({
   const [showSun, setShowSun] = useState(true);
   const [showSunRays, setShowSunRays] = useState(true);
   const [viewMode, setViewMode] = useState<'sun' | 'earth'>('sun');
+  const [utcHour, setUtcHour] = useState(() => new Date().getUTCHours());
+  const [selectedCity, setSelectedCity] = useState<CityInfo | null>(FAMOUS_CITIES[0]);
   
   const cameraControllerRef = useRef<CameraControllerHandle>(null);
 
+  // 自动旋转时更新UTC时间（每500ms增加1小时）
+  useEffect(() => {
+    if (!autoRotate) return;
+    
+    const interval = setInterval(() => {
+      setUtcHour(prev => {
+        const next = prev + 1;
+        return next >= 24 ? 0 : next;
+      });
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [autoRotate]);
+
   // 计算太阳直射点纬度
   const subsolarLat = useMemo(() => getSubsolarLatitude(dayOfYear), [dayOfYear]);
+
+  // 处理视角切换，同时移动相机
+  const handleViewModeChange = useCallback((mode: 'sun' | 'earth') => {
+    setViewMode(mode);
+    if (cameraControllerRef.current) {
+      if (mode === 'sun') {
+        // 太阳视角：从太阳方向看地球（从左前方看，能看到昼夜分界）
+        cameraControllerRef.current.setPosition([14, 5, 10]);
+      } else {
+        // 地球视角：从地球上空俯视（从正上方偏前看）
+        cameraControllerRef.current.setPosition([0, 12, 8]);
+      }
+    }
+  }, []);
 
   // 知识点信息内容 - 使用卡片数组格式
   const infoContent = [
@@ -1588,7 +2161,6 @@ export default function DayNightDemo3D({
           <Canvas camera={{ position: [14, 5, 10], fov: 50 }} style={{ width: '100%', height: '100%' }}>
             <Scene
               showLabels={showLabels}
-              autoRotate={autoRotate}
               subsolarLat={subsolarLat}
               showDawnLine={showDawnLine}
               showDuskLine={showDuskLine}
@@ -1598,6 +2170,8 @@ export default function DayNightDemo3D({
               showSunRays={showSunRays}
               viewMode={viewMode}
               cameraRef={cameraControllerRef}
+              utcHour={utcHour}
+              selectedCity={selectedCity}
             />
           </Canvas>
         </Suspense>
@@ -1613,6 +2187,10 @@ export default function DayNightDemo3D({
           setDayOfYear={setDayOfYear}
           initialDayOfYear={initialDayOfYear}
           subsolarLat={subsolarLat}
+          utcHour={utcHour}
+          setUtcHour={setUtcHour}
+          selectedCity={selectedCity}
+          setSelectedCity={setSelectedCity}
           showDawnLine={showDawnLine}
           setShowDawnLine={setShowDawnLine}
           showDuskLine={showDuskLine}
@@ -1622,7 +2200,7 @@ export default function DayNightDemo3D({
           showShading={showShading}
           setShowShading={setShowShading}
           viewMode={viewMode}
-          setViewMode={setViewMode}
+          setViewMode={handleViewModeChange}
           showSun={showSun}
           setShowSun={setShowSun}
           showSunRays={showSunRays}
@@ -1635,6 +2213,12 @@ export default function DayNightDemo3D({
           setDayOfYear={setDayOfYear}
           initialDayOfYear={initialDayOfYear}
           subsolarLat={subsolarLat}
+          utcHour={utcHour}
+          setUtcHour={setUtcHour}
+          viewMode={viewMode}
+          setViewMode={handleViewModeChange}
+          selectedCity={selectedCity}
+          setSelectedCity={setSelectedCity}
         />
       }
       bottomControls={(is3D) => (

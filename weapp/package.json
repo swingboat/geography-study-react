@@ -20,10 +20,13 @@
     "ios >= 8"
   ],
   "dependencies": {
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
     "@tarojs/components": "3.6.32",
     "@tarojs/helper": "3.6.32",
-    "@tarojs/plugin-platform-weapp": "3.6.32",
+    "@tarojs/plugin-framework-react": "^3.6.32",
     "@tarojs/plugin-platform-h5": "3.6.32",
+    "@tarojs/plugin-platform-weapp": "3.6.32",
     "@tarojs/react": "3.6.32",
     "@tarojs/runtime": "3.6.32",
     "@tarojs/shared": "3.6.32",

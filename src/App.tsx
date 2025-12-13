@@ -20,6 +20,7 @@ import TropicsDemo3D from './pages/elective1/TropicsDemo3D';
 import LongitudeDemo3D from './pages/elective1/LongitudeDemo3D';
 import TimeZoneDemo3D from './pages/elective1/TimeZoneDemo3D';
 import DayNightDemo3D from './pages/elective1/DayNightDemo3D';
+import ShadowDemo3D from './pages/elective1/ShadowDemo3D';
 
 // 动画变体
 const containerVariants = {
@@ -293,6 +294,44 @@ function HomePage() {
                 </Card>
               </motion.div>
 
+              {/* 影子与太阳方位 */}
+              <motion.div variants={itemVariants}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    background: 'rgba(255,255,255,0.95)',
+                    backdropFilter: 'blur(10px)',
+                    borderRadius: 4,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-8px)',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+                    }
+                  }}
+                >
+                  <CardActionArea component={Link} to="/elective1/shadow" sx={{ height: '100%', p: 1 }}>
+                    <CardContent>
+                      <div style={{ fontSize: '3rem', marginBottom: 16 }}>🧍</div>
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
+                        影子与太阳方位
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        根据影子判断方向与时间，掌握太阳高度角
+                      </Typography>
+                      <Chip 
+                        label="✨ 3D 互动" 
+                        sx={{ 
+                          background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+                          color: 'white',
+                          fontWeight: 600
+                        }} 
+                        size="small" 
+                      />
+                    </CardContent>
+                  </CardActionArea>
+                </Card>
+              </motion.div>
+
               {/* 四季变化 - 待开发 */}
               <motion.div variants={itemVariants}>
                 <Card 
@@ -330,8 +369,8 @@ function ObliquityPage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
-      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -372,8 +411,8 @@ function TropicsPage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
-      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3 }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 32, paddingBottom: isMobile ? 0 : 32 }}>
+      <Container maxWidth="xl" sx={{ px: isMobile ? 0 : 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -414,8 +453,8 @@ function LongitudePage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      <Container maxWidth={false} sx={{ px: isMobile ? 0 : 3, maxWidth: '100%' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      <Container maxWidth={false} sx={{ px: isMobile ? 0 : 3, maxWidth: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -456,8 +495,8 @@ function TimeZonePage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -498,8 +537,8 @@ function DayNightPage() {
   const navigate = useNavigate();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
-      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2 }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
         {/* 桌面端面包屑导航 */}
         {!isMobile && (
           <motion.div
@@ -533,6 +572,48 @@ function DayNightPage() {
   );
 }
 
+// 影子与太阳方位页面
+function ShadowPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const navigate = useNavigate();
+  
+  return (
+    <div style={{ height: '100vh', overflow: 'hidden', background: '#F8FAFC', paddingTop: isMobile ? 0 : 16, paddingBottom: isMobile ? 0 : 16 }}>
+      <Container maxWidth="xl" sx={{ py: isMobile ? 0 : 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* 桌面端面包屑导航 */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Breadcrumbs 
+              separator={<NavigateNextIcon fontSize="small" />} 
+              sx={{ mb: 3 }}
+            >
+              <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', color: '#F59E0B' }}>
+                <HomeIcon sx={{ mr: 0.5 }} fontSize="small" />
+                首页
+              </Link>
+              <Typography color="text.secondary">选修一</Typography>
+              <Typography sx={{ 
+                background: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 600
+              }}>影子与太阳方位</Typography>
+            </Breadcrumbs>
+          </motion.div>
+        )}
+        
+        <ShadowDemo3D onBack={() => navigate('/')} />
+      </Container>
+    </div>
+  );
+}
+
 // 主应用组件
 function App() {
   return (
@@ -544,6 +625,7 @@ function App() {
         <Route path="/elective1/longitude" element={<LongitudePage />} />
         <Route path="/elective1/timezone" element={<TimeZonePage />} />
         <Route path="/elective1/daynight" element={<DayNightPage />} />
+        <Route path="/elective1/shadow" element={<ShadowPage />} />
       </Routes>
     </BrowserRouter>
   );

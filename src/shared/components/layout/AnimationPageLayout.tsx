@@ -439,6 +439,10 @@ export function AnimationPageLayout({
     } else {
       setInternalIsPanelOpen(value);
     }
+    // 在过渡动画结束后触发 resize 事件，让 Canvas 重新计算尺寸
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 350); // 略大于 transition 时间 (0.3s)
   }, [onPanelOpenChange]);
 
   const is3D = externalIs3D ?? internalIs3D;
@@ -655,8 +659,8 @@ export function AnimationPageLayout({
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     flexDirection: 'row',
-    height: 'calc(100vh - 100px)',
-    minHeight: '400px',
+    flex: 1,
+    minHeight: 0,
     position: 'relative',
     overflow: 'hidden',
     width: '100%',

@@ -6,3 +6,6 @@ export * from './three';
 
 // Layout components
 export * from './layout';
+
+// Location components
+export * from './LocationSelector';
